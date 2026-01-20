@@ -27,14 +27,24 @@ export const AuthProvider = ({ children }) => {
 
             localStorage.setItem('accessToken', data.access);
             localStorage.setItem('refreshToken', data.refresh);
-            localStorage.setItem('user', JSON.stringify({ username }));
 
+            // Set token temporarily to fetch user profile
             setToken(data.access);
-            setUser({ username });
+
+            // Fetch detailed user profile (now includes role)
+            const { getCurrentUser } = await import('../services/api');
+            const profile = await getCurrentUser();
+
+            localStorage.setItem('user', JSON.stringify(profile));
+            setUser(profile);
 
             return true;
         } catch (error) {
             console.error('Login failed:', error);
+            // Revert token if profile fetch fails
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            setToken(null);
             return false;
         }
     };

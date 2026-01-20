@@ -7,15 +7,35 @@ from .models import (
     CropManagement,
     CropMeasurement,
     Media,
-    UserProfile
+    UserProfile,
+    AuditLog
 )
 from rest_framework_gis.fields import GeometryField
 
 
 class UserSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='userprofile.role')
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('userprofile', {})
+        role = profile_data.get('role')
+        
+        # Update User fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update Profile role
+        if role:
+            profile = instance.userprofile
+            profile.role = role
+            profile.save()
+            
+        return instance
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -52,10 +72,14 @@ class FieldSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     location = GeometryField()
     boundary = GeometryField(required=False, allow_null=True)
+    observation_count = serializers.SerializerMethodField()
+    
+    def get_observation_count(self, obj):
+        return obj.observation_set.count()
     
     class Meta:
         model = Field
-        fields = ['id', 'field_id', 'location', 'boundary', 'created_by', 'created_by_name', 'created_at']
+        fields = ['id', 'field_id', 'location', 'boundary', 'created_by', 'created_by_name', 'observation_count', 'created_at']
         read_only_fields = ['created_by']
 
 
@@ -197,4 +221,12 @@ class ObservationCreateSerializer(serializers.ModelSerializer):
         CropMeasurement.objects.create(observation=observation, **crop_measurement_data)
         
         return observation
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = ['id', 'user', 'username', 'action', 'resource_type', 'resource_id', 'timestamp', 'details']
 

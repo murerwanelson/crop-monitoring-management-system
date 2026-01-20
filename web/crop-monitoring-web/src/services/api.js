@@ -68,6 +68,11 @@ export const login = async (username, password) => {
     return response.data;
 };
 
+export const getCurrentUser = async () => {
+    const response = await api.get('/users/me/');
+    return response.data;
+};
+
 // Fields
 export const getFields = async () => {
     const response = await api.get('/fields/');
@@ -77,6 +82,20 @@ export const getFields = async () => {
 export const getFieldMapData = async () => {
     const response = await api.get('/fields/map_data/');
     return response.data;
+};
+
+export const createField = async (data) => {
+    const response = await api.post('/fields/', data);
+    return response.data;
+};
+
+export const updateField = async (id, data) => {
+    const response = await api.patch(`/fields/${id}/`, data);
+    return response.data;
+};
+
+export const deleteField = async (id) => {
+    await api.delete(`/fields/${id}/`);
 };
 
 // Observations
@@ -122,13 +141,67 @@ export const getGrowthAnalysis = async (cropVariety = null) => {
 };
 
 // Weather
-export const getWeatherData = async (city = 'Jinja,UG') => {
-    // OpenWeatherMap API (placeholder key)
-    const API_KEY = process.env.REACT_APP_WEATHER_API_KEY;
-    if (!API_KEY) throw new Error('No API key');
+// Weather Service (Switched to Open-Meteo for free access without API Key)
+export const getWeatherData = async (params = { city: 'Jinja,UG' }) => {
+    let lat = 0.4479, lon = 33.2026; // Default Jinja
 
-    const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`);
-    return response.data;
+    // 1. Resolve Coordinates
+    if (params.lat && params.lon) {
+        lat = params.lat;
+        lon = params.lon;
+    } else {
+        // If city name is provided, we would ideally geocode it. 
+        // For simplicity in this demo without a key, we'll default to Jinja if no coords.
+        // Or we could use a geocoding API, but let's assume coords are primary.
+    }
+
+    try {
+        // 2. Fetch Weather from Open-Meteo
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,is_day`;
+        const weatherRes = await axios.get(weatherUrl);
+        const current = weatherRes.data.current;
+
+        // 3. Fetch Location Name (Reverse Geocoding via Nominatim)
+        // Note: Nominatim requires a User-Agent header, but browsers set it automatically.
+        let cityName = params.city || 'Unknown Location';
+        if (params.lat && params.lon) {
+            try {
+                const geoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+                const geoRes = await axios.get(geoUrl);
+                const address = geoRes.data.address;
+                cityName = address.city || address.town || address.village || address.county || 'Local Field';
+            } catch (e) {
+                console.warn('Reverse geocoding failed', e);
+            }
+        }
+
+        // 4. Map WMO Weather Codes to Descriptions
+        const wmoCodes = {
+            0: 'Clear Sky',
+            1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
+            45: 'Fog', 48: 'Depositing Rime Fog',
+            51: 'Light Drizzle', 53: 'Moderate Drizzle', 55: 'Dense Drizzle',
+            61: 'Slight Rain', 63: 'Moderate Rain', 65: 'Heavy Rain',
+            71: 'Slight Snow', 73: 'Moderate Snow', 75: 'Heavy Snow',
+            80: 'Slight Showers', 81: 'Moderate Showers', 82: 'Violent Showers',
+            95: 'Thunderstorm', 96: 'Thunderstorm with Hail', 99: 'Heavy Thunderstorm'
+        };
+        const weatherDesc = wmoCodes[current.weather_code] || 'Variable';
+
+        // 5. Return data in the structure expected by Home.js
+        return {
+            main: {
+                temp: current.temperature_2m,
+                humidity: current.relative_humidity_2m
+            },
+            weather: [{ main: weatherDesc }],
+            name: cityName
+        };
+
+    } catch (error) {
+        console.error("Open-Meteo Error:", error);
+        throw error;
+    }
 };
 
 export default api;

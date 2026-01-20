@@ -9,7 +9,8 @@ from .models import (
     Observation,
     CropManagement,
     CropMeasurement,
-    Media
+    Media,
+    AuditLog
 )
 from .serializers import (
     FieldSerializer,
@@ -20,7 +21,9 @@ from .serializers import (
     CropManagementSerializer,
     CropMeasurementSerializer,
     MediaSerializer,
-    RegisterSerializer
+    RegisterSerializer,
+    UserSerializer,
+    AuditLogSerializer
 )
 from rest_framework.generics import CreateAPIView
 from .stats import get_dashboard_stats, get_moisture_trends, get_growth_analysis
@@ -163,6 +166,36 @@ class RegisterView(CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing users.
+    - List/Retrieve/Update (Admin only)
+    - me (Authenticated users)
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAdmin]
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
+    def get_permissions(self):
+        if self.action == 'me':
+            return [permissions.IsAuthenticated()]
+        return super().get_permissions()
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing audit logs (Admin only).
+    """
+    queryset = AuditLog.objects.all().order_by('-timestamp')
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAdmin]
 
    
 

@@ -7,7 +7,9 @@ from .views import (
     CropMeasurementViewSet,
     MediaViewSet,
     StatsViewSet,
-    RegisterView
+    RegisterView,
+    UserViewSet,
+    AuditLogViewSet
 )
 
 router = DefaultRouter()
@@ -17,6 +19,8 @@ router.register(r'crop-management', CropManagementViewSet)
 router.register(r'crop-measurements', CropMeasurementViewSet)
 router.register(r'media', MediaViewSet)
 router.register(r'stats', StatsViewSet, basename='stats')
+router.register(r'users', UserViewSet)
+router.register(r'audit-logs', AuditLogViewSet)
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),

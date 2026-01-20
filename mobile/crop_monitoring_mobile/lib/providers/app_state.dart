@@ -35,8 +35,11 @@ class AppState with ChangeNotifier {
     _isAuthenticated = token != null;
     
     if (_isAuthenticated) {
-      final role = await _storage.read(key: 'user_role');
-      _userRole = role;
+      _userRole = await _storage.read(key: 'role');
+      final username = await _storage.read(key: 'username');
+      if (username != null) {
+        _user = {'username': username};
+      }
     }
     
     notifyListeners();
@@ -63,10 +66,12 @@ class AppState with ChangeNotifier {
       if (success) {
         _isAuthenticated = true;
         
-        // Fetch and store user profile/role
-        // Note: You'll need to add a get_profile endpoint to the backend
-        // For now, we'll store username
-        await _storage.write(key: 'username', value: username);
+        // Fetch values that were written to storage by ApiService.login
+        _userRole = await _storage.read(key: 'role');
+        final username = await _storage.read(key: 'username');
+        if (username != null) {
+          _user = {'username': username};
+        }
         
         notifyListeners();
       }

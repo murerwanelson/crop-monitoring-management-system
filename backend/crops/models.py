@@ -61,3 +61,15 @@ class Media(models.Model):
     captured_at = models.DateTimeField(auto_now_add=True)
 
 
+class AuditLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=255)
+    resource_type = models.CharField(max_length=100)
+    resource_id = models.CharField(max_length=100, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user} - {self.action} - {self.timestamp}"
+
+

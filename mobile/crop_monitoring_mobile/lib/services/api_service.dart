@@ -31,9 +31,30 @@ class ApiService {
       final data = jsonDecode(response.body);
       await storage.write(key: 'accessToken', value: data['access']);
       await storage.write(key: 'refreshToken', value: data['refresh']);
+      
+      // Fetch user profile and store role
+      try {
+        final profile = await getUserProfile();
+        await storage.write(key: 'role', value: profile['role']);
+        await storage.write(key: 'username', value: profile['username']);
+      } catch (e) {
+        print('Failed to fetch user profile during login: $e');
+      }
+      
       return true;
     }
     return false;
+  }
+
+  // GET current user profile
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final response = await authenticatedRequest('GET', '/users/me/');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load user profile');
+    }
   }
 
   // Get headers with Bearer token
@@ -196,5 +217,37 @@ class ApiService {
     if (response.statusCode != 201) {
       throw Exception('Failed to upload media');
     }
+  }
+  
+  // Get weather from Open-Meteo
+  Future<String> getWeather(double lat, double lon) async {
+    try {
+      final url = 'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true';
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final code = data['current_weather']['weathercode'];
+        return _mapWeatherCode(code);
+      }
+    } catch (e) {
+      print('Weather fetch error: $e');
+    }
+    return '';
+  }
+
+  String _mapWeatherCode(int code) {
+    if (code == 0) return 'Clear sky';
+    if (code == 1 || code == 2 || code == 3) return 'Partly cloudy';
+    if (code == 45 || code == 48) return 'Fog';
+    if (code >= 51 && code <= 55) return 'Drizzle';
+    if (code >= 56 && code <= 57) return 'Freezing Drizzle';
+    if (code >= 61 && code <= 65) return 'Rain';
+    if (code >= 66 && code <= 67) return 'Freezing Rain';
+    if (code >= 71 && code <= 77) return 'Snow fall';
+    if (code >= 80 && code <= 82) return 'Rain showers';
+    if (code >= 85 && code <= 86) return 'Snow showers';
+    if (code >= 95) return 'Thunderstorm';
+    return 'Unknown';
   }
 }

@@ -12,6 +12,10 @@ import {
     useTheme,
     Chip,
     Avatar,
+    Stack,
+    Divider,
+    Menu,
+    MenuItem,
 } from '@mui/material';
 import {
     Dashboard as DashboardIcon,
@@ -33,31 +37,80 @@ import { getDashboardStats, getWeatherData } from '../services/api';
 
 const Home = () => {
     const [stats, setStats] = useState(null);
-    const [weather, setWeather] = useState({ temp: 28, city: 'Kakira', desc: 'Sunny', hum: 45 });
+    const [weather, setWeather] = useState({ temp: 28, city: 'Kakira', subtext: 'Uganda, East Africa', desc: 'Sunny', hum: 45 });
+    const [anchorElNotifications, setAnchorElNotifications] = useState(null);
     const theme = useTheme();
+
+    const handleOpenNotifications = (event) => {
+        setAnchorElNotifications(event.currentTarget);
+    };
+
+    const handleCloseNotifications = () => {
+        setAnchorElNotifications(null);
+    };
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const data = await getDashboardStats(30);
-                setStats(data);
+                const statsData = await getDashboardStats(30);
+                setStats(statsData);
 
-                // Try to get real weather
-                try {
-                    const weatherData = await getWeatherData('Jinja,UG');
+                // Helper to set weather state
+                const updateWeather = (data, isFallback = false) => {
                     setWeather({
-                        temp: Math.round(weatherData.main.temp),
-                        city: 'Kakira Estate',
-                        desc: weatherData.weather[0].main,
-                        hum: weatherData.main.humidity
+                        temp: Math.round(data.main.temp),
+                        city: data.name || (isFallback ? 'Kakira (Default)' : 'Unknown Location'),
+                        subtext: isFallback ? 'Uganda, East Africa' : 'Current Location',
+                        desc: data.weather[0].main,
+                        hum: data.main.humidity,
+                        loading: false
                     });
-                } catch (wErr) {
-                    console.log('Using fallback weather');
+                };
+
+                // Geolocation for weather
+                console.log("Checking geolocation support...");
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(async (position) => {
+                        console.log("Geolocation success:", position.coords.latitude, position.coords.longitude);
+                        try {
+                            const { latitude, longitude } = position.coords;
+                            const weatherData = await getWeatherData({ lat: latitude, lon: longitude });
+                            console.log("Weather data fetched:", weatherData);
+                            updateWeather(weatherData);
+                        } catch (geoErr) {
+                            console.error('Geo weather fetch failed, falling back:', geoErr);
+                            fallbackWeather();
+                        }
+                    }, (err) => {
+                        console.error('Geolocation denied/error:', err.code, err.message);
+                        fallbackWeather();
+                    });
+                } else {
+                    console.log("Geolocation not supported by this browser.");
+                    fallbackWeather();
                 }
+
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
             }
         };
+
+        const fallbackWeather = async () => {
+            try {
+                const weatherData = await getWeatherData({ city: 'Jinja,UG' });
+                setWeather({
+                    temp: Math.round(weatherData.main.temp),
+                    city: 'Jinja (Default)',
+                    desc: weatherData.weather[0].main,
+                    hum: weatherData.main.humidity,
+                    loading: false
+                });
+            } catch (wErr) {
+                console.log('Using default weather state');
+                setWeather(prev => ({ ...prev, loading: false }));
+            }
+        };
+
         fetchData();
     }, []);
 
@@ -65,53 +118,98 @@ const Home = () => {
         <Paper
             elevation={0}
             sx={{
-                p: 4,
-                borderRadius: 4,
-                background: `linear-gradient(120deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                p: { xs: 4, md: 6 },
+                borderRadius: 6,
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, #059669 100%)`,
                 color: 'white',
                 position: 'relative',
                 overflow: 'hidden',
-                height: '100%',
+                boxShadow: '0 20px 40px -12px rgba(16, 185, 129, 0.3)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
             }}
         >
-            <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-                <CropIcon sx={{ fontSize: 180 }} />
+            {/* Decorative background elements */}
+            <Box sx={{ position: 'absolute', top: -40, right: -40, opacity: 0.15, transform: 'rotate(-15deg)' }}>
+                <CropIcon sx={{ fontSize: 280 }} />
             </Box>
+            <Box
+                sx={{
+                    position: 'absolute',
+                    bottom: -60,
+                    left: '20%',
+                    width: 300,
+                    height: 300,
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                    zIndex: 0
+                }}
+            />
 
             <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Chip
-                    label="System Operational"
-                    size="small"
-                    color="success"
-                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', mb: 2, fontWeight: 600 }}
-                />
-                <Typography variant="h4" fontWeight="800" gutterBottom>
-                    Crop Monitoring System
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
+                    <Chip
+                        label="System Operational"
+                        size="small"
+                        sx={{
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            fontWeight: 700,
+                            backdropFilter: 'blur(4px)',
+                            border: '1px solid rgba(255,255,255,0.3)'
+                        }}
+                    />
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                        V 2.0.4
+                    </Typography>
+                </Stack>
+
+                <Typography variant="h2" fontWeight="800" gutterBottom sx={{ fontSize: { xs: '2.5rem', md: '3.5rem' }, letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+                    Smart Agriculture <br />
+                    <span style={{ color: '#A7F3D0' }}>Real-time Intelligence</span>
                 </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.9, maxWidth: '85%', mb: 3, lineHeight: 1.6 }}>
-                    An advanced GIS-integrated management solution designed to optimize agricultural estate productivity.
-                    Monitor field growth, track soil conditions, and generate yield predictions through real-time data collection and spatial analysis.
+
+                <Typography variant="h6" sx={{ opacity: 0.9, maxWidth: '600px', mb: 5, fontWeight: 400, lineHeight: 1.6 }}>
+                    Optimize your agricultural estate with precision GIS integration,
+                    predictive growth analytics, and seamless data monitoring.
                 </Typography>
-                <Button
-                    component={Link}
-                    to="/dashboard"
-                    variant="contained"
-                    sx={{
-                        bgcolor: 'white',
-                        color: 'primary.main',
-                        fontWeight: 'bold',
-                        px: 3,
-                        py: 1,
-                        borderRadius: 2,
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
-                    }}
-                    endIcon={<ArrowIcon />}
-                >
-                    View Analytics
-                </Button>
+
+                <Stack direction="row" spacing={2}>
+                    <Button
+                        component={Link}
+                        to="/dashboard"
+                        variant="contained"
+                        sx={{
+                            bgcolor: 'white',
+                            color: 'primary.dark',
+                            fontWeight: 800,
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: '14px',
+                            '&:hover': { bgcolor: '#F0FDF4', transform: 'translateY(-2px)' },
+                            transition: 'all 0.2s',
+                        }}
+                        endIcon={<ArrowIcon />}
+                    >
+                        Explore Analytics
+                    </Button>
+                    <Button
+                        component={Link}
+                        to="/map"
+                        variant="outlined"
+                        sx={{
+                            color: 'white',
+                            borderColor: 'rgba(255,255,255,0.4)',
+                            fontWeight: 700,
+                            px: 4,
+                            borderRadius: '14px',
+                            '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
+                        }}
+                    >
+                        Interactive Map
+                    </Button>
+                </Stack>
             </Box>
         </Paper>
     );
@@ -121,64 +219,96 @@ const Home = () => {
             elevation={0}
             sx={{
                 p: 3,
-                borderRadius: 4,
-                bgcolor: 'info.light', // Fallback
-                background: 'linear-gradient(180deg, #4FC3F7 0%, #29B6F6 100%)',
+                borderRadius: 5,
+                background: 'linear-gradient(180deg, #38BDF8 0%, #0284C7 100%)',
                 color: 'white',
                 height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: '0 15px 30px -10px rgba(14, 165, 233, 0.3)'
             }}
         >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
-                    <Typography variant="subtitle2" fontWeight="600">{weather.city}</Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Jinja, Uganda</Typography>
+                    <Typography variant="h6" fontWeight="800" sx={{ lineHeight: 1.1 }}>{weather.city}</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.8, fontWeight: 500 }}>{weather.subtext || 'Checking location...'}</Typography>
                 </Box>
-                <SunIcon />
+                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
+                    <SunIcon />
+                </Avatar>
             </Box>
 
-            <Box sx={{ mt: 3, display: 'flex', alignItems: 'flex-end', gap: 1 }}>
-                <Typography variant="h2" fontWeight="700">{weather.temp}°</Typography>
-                <Typography variant="h6" sx={{ mb: 1 }}>C</Typography>
+            <Box sx={{ my: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <Typography variant="h2" fontWeight="800" sx={{ lineHeight: 1 }}>{weather.temp}</Typography>
+                    <Typography variant="h5" sx={{ mt: 1, fontWeight: 700 }}>°C</Typography>
+                </Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mt: 0.5, opacity: 0.9 }}>{weather.desc}</Typography>
             </Box>
 
-            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2, bgcolor: 'rgba(0,0,0,0.1)', p: 1.5, borderRadius: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <RainIcon fontSize="small" sx={{ opacity: 0.8 }} />
-                    <Typography variant="caption" fontWeight="600">{weather.hum}% Humidity</Typography>
+                    <Typography variant="caption" fontWeight="700">{weather.hum}% Hum</Typography>
                 </Box>
+                <Divider orientation="vertical" flexItem sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TrendingUpIcon fontSize="small" sx={{ opacity: 0.8 }} />
-                    <Typography variant="caption" fontWeight="600">{weather.desc}</Typography>
+                    <Typography variant="caption" fontWeight="700">Optimal</Typography>
                 </Box>
             </Box>
         </Paper>
     );
 
-    const StatCard = ({ title, value, icon, color, trend }) => (
-        <Card sx={{ height: '100%', borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+    const StatCard = ({ title, value, icon, color, trend, trendColor = 'success' }) => (
+        <Card
+            sx={{
+                height: '100%',
+                borderRadius: 5,
+                border: '1px solid',
+                borderColor: 'rgba(0,0,0,0.05)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                    transform: 'translateY(-6px)',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)'
+                }
+            }}
+            elevation={0}
+        >
             <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: `${color}15`, color: color, borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                    <Avatar
+                        sx={{
+                            bgcolor: `${color}10`,
+                            color: color,
+                            borderRadius: '12px',
+                            width: 48,
+                            height: 48,
+                            boxShadow: `0 8px 16px -4px ${color}20`
+                        }}
+                    >
                         {icon}
                     </Avatar>
                     {trend && (
                         <Chip
                             label={trend}
                             size="small"
+                            color={trendColor}
                             sx={{
-                                height: 24,
-                                bgcolor: 'success.light',
-                                color: 'success.dark',
-                                fontWeight: 'bold',
-                                fontSize: '0.75rem'
+                                fontWeight: 800,
+                                fontSize: '0.7rem',
+                                borderRadius: '8px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
                             }}
                         />
                     )}
                 </Box>
-                <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5 }}>
+                <Typography variant="h3" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary', letterSpacing: '-0.02em' }}>
                     {value}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" fontWeight="500">
+                <Typography variant="body2" color="text.secondary" fontWeight="600" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.75rem' }}>
                     {title}
                 </Typography>
             </CardContent>
@@ -191,149 +321,210 @@ const Home = () => {
             to={to}
             sx={{
                 p: 3,
-                borderRadius: 3,
+                borderRadius: 5,
                 textDecoration: 'none',
                 color: 'inherit',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 2,
-                transition: 'all 0.2s',
-                border: '1px solid transparent',
+                gap: 2.5,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(0,0,0,0.05)',
+                bgcolor: 'white',
                 '&:hover': {
-                    bgcolor: 'background.paper',
                     borderColor: color,
-                    transform: 'translateY(-2px)',
-                    boxShadow: `0 4px 20px ${color}20`
+                    transform: 'translateY(-4px)',
+                    boxShadow: `0 12px 20px -8px ${color}30`
                 }
             }}
             elevation={0}
         >
-            <Avatar sx={{ bgcolor: `${color}15`, color: color, width: 48, height: 48, borderRadius: 2 }}>
+            <Avatar sx={{ bgcolor: `${color}10`, color: color, width: 56, height: 56, borderRadius: '16px' }}>
                 {icon}
             </Avatar>
             <Box>
-                <Typography variant="h6" fontWeight="bold">{title}</Typography>
-                <Typography variant="caption" color="text.secondary">{desc}</Typography>
+                <Typography variant="h6" fontWeight="800" sx={{ color: 'text.primary' }}>{title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>{desc}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1 }} />
-            <ArrowIcon sx={{ color: 'text.disabled' }} />
+            <IconButton sx={{ bgcolor: 'rgba(0,0,0,0.03)', borderRadius: '10px' }}>
+                <ArrowIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+            </IconButton>
         </Paper>
     );
 
     return (
-        <Container maxWidth="xl" sx={{ pb: 4 }}>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Container maxWidth="xl" sx={{ pb: 8 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
                 <Box>
-                    <Typography variant="h5" fontWeight="800" color="text.primary">Dashboard Overview</Typography>
-                    <Typography variant="body2" color="text.secondary">Real-time farm insights</Typography>
+                    <Typography variant="h4" fontWeight="800" color="text.primary" sx={{ letterSpacing: '-0.02em' }}>Management Hub</Typography>
+                    <Typography variant="subtitle1" color="text.secondary" fontWeight={500}>Welcome back. Here is what's happening today.</Typography>
                 </Box>
-                <IconButton sx={{ bgcolor: 'white', boxShadow: 1 }}>
-                    <BellIcon color="action" />
-                </IconButton>
-            </Box>
+                <Stack direction="row" spacing={2}>
+                    <IconButton
+                        onClick={handleOpenNotifications}
+                        sx={{ bgcolor: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 3, p: 1.5 }}
+                    >
+                        <BellIcon sx={{ color: 'text.secondary' }} />
+                    </IconButton>
+                    <Menu
+                        anchorEl={anchorElNotifications}
+                        open={Boolean(anchorElNotifications)}
+                        onClose={handleCloseNotifications}
+                        PaperProps={{
+                            sx: { mt: 1.5, borderRadius: 3, minWidth: 280, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }
+                        }}
+                        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                    >
+                        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                            <Typography variant="subtitle2" fontWeight={800}>Notifications</Typography>
+                        </Box>
+                        <MenuItem onClick={handleCloseNotifications} sx={{ py: 2, justifyContent: 'center' }}>
+                            <Typography variant="body2" color="text.secondary" fontWeight={500}>No new notifications</Typography>
+                        </MenuItem>
+                    </Menu>
 
-            {/* Top Row: Welcome */}
-            <Box sx={{ mb: 4 }}>
+                    <Button
+                        component={Link}
+                        to="/dashboard"
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        sx={{ borderRadius: 3, fontWeight: 700, px: 3 }}
+                    >
+                        New Entry
+                    </Button>
+                </Stack>
+            </Stack>
+
+            {/* Top Row: Welcome Highlight */}
+            <Box sx={{ mb: 6 }}>
                 <WelcomeCard />
             </Box>
 
-            {/* Metrics Row: Weather + 4 Stats */}
-            <Box sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
-                gap: 2,
-                mb: 4
-            }}>
-                <WeatherWidget />
+            {/* Metrics Row: Grid for responsiveness */}
+            <Grid container spacing={3} sx={{ mb: 6 }}>
+                <Grid item xs={12} md={4} lg={2.4}>
+                    <WeatherWidget />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={2.4}>
+                    <StatCard
+                        title="Active Fields"
+                        value={stats?.total_fields || 0}
+                        icon={<FieldIcon />}
+                        color={theme.palette.primary.main}
+                        trend="+2 New"
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={2.4}>
+                    <StatCard
+                        title="Observations"
+                        value={stats?.total_observations || 0}
+                        icon={<ObservationIcon />}
+                        color={theme.palette.secondary.main}
+                        trend="Active"
+                        trendColor="info"
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={2.4}>
+                    <StatCard
+                        title="Varieties"
+                        value={stats?.unique_crop_varieties || 0}
+                        icon={<CropIcon />}
+                        color={theme.palette.success.main}
+                        trend="Stable"
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={2.4}>
+                    <StatCard
+                        title="Plant Health"
+                        value="94%"
+                        icon={<SunIcon />}
+                        color="#F59E0B"
+                        trend="Good"
+                    />
+                </Grid>
+            </Grid>
 
-                <StatCard
-                    title="Active Fields"
-                    value={stats?.total_fields || 0}
-                    icon={<FieldIcon />}
-                    color={theme.palette.primary.main}
-                    trend="+2 this week"
-                />
-
-                <StatCard
-                    title="Observations"
-                    value={stats?.total_observations || 0}
-                    icon={<ObservationIcon />}
-                    color={theme.palette.secondary.main}
-                    trend="+15 today"
-                />
-
-                <StatCard
-                    title="Crop Varieties"
-                    value={stats?.unique_crop_varieties || 0}
-                    icon={<CropIcon />}
-                    color={theme.palette.success.main}
-                />
-
-                <StatCard
-                    title="Alerts"
-                    value="3"
-                    icon={<BellIcon />}
-                    color={theme.palette.error.main}
-                    trend="Action needed"
-                />
+            {/* Core Workflow Section */}
+            <Box sx={{ mb: 8 }}>
+                <Typography variant="h5" fontWeight="800" sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ width: 8, height: 24, bgcolor: 'primary.main', borderRadius: 4 }} />
+                    Interactive Guidelines
+                </Typography>
+                <Grid container spacing={3}>
+                    {[
+                        { step: '01', title: 'Define Boundaries', desc: 'Map your fields using GIS tools to establish precise cultivation areas.', icon: <MapIcon /> },
+                        { step: '02', title: 'Collect Insights', desc: 'Record biometric data from the field to track growth and soil health.', icon: <PointerIcon /> },
+                        { step: '03', title: 'Sync Remotely', desc: 'Our offline-first mobile engine ensures your data is always safe.', icon: <SyncIcon /> },
+                        { step: '04', title: 'Drive Decisions', desc: 'Leverage analytics to optimize fertilizer use and yield predictions.', icon: <TrendingUpIcon /> }
+                    ].map((item, idx) => (
+                        <Grid item xs={12} sm={6} md={3} key={idx}>
+                            <Paper sx={{
+                                p: 4,
+                                height: '100%',
+                                borderRadius: 5,
+                                position: 'relative',
+                                border: '1px solid rgba(0,0,0,0.05)',
+                                transition: 'all 0.3s',
+                                '&:hover': { bgcolor: 'white', boxShadow: '0 12px 24px -8px rgba(0,0,0,0.08)' }
+                            }} elevation={0}>
+                                <Typography variant="h4" sx={{
+                                    fontWeight: 900,
+                                    color: 'rgba(16, 185, 129, 0.1)',
+                                    position: 'absolute',
+                                    top: 16,
+                                    right: 24,
+                                    lineHeight: 1
+                                }}>{item.step}</Typography>
+                                <Avatar sx={{ width: 44, height: 44, bgcolor: 'primary.main', mb: 3, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                                    {item.icon}
+                                </Avatar>
+                                <Typography variant="h6" fontWeight="800" gutterBottom>{item.title}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, fontWeight: 500 }}>
+                                    {item.desc}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
             </Box>
 
-            {/* Data Collection Guidance */}
-            <Typography variant="h6" fontWeight="700" sx={{ mb: 2, mt: 4 }}>How to Collect Monitoring Data</Typography>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                {[
-                    { step: 1, title: 'Define Field', desc: 'Identify your field on the interactive map and define its GIS boundaries.', icon: <MapIcon /> },
-                    { step: 2, title: 'Record Data', desc: 'Input crop height, population density, and current management activities.', icon: <PointerIcon /> },
-                    { step: 3, title: 'Mobile Sync', desc: 'Use the mobile app for field-side capture and instant offline-first syncing.', icon: <SyncIcon /> },
-                    { step: 4, title: 'Analyze Results', desc: 'Review automated growth trends and health alerts on your dashboard.', icon: <TrendingUpIcon /> }
-                ].map((item, idx) => (
-                    <Grid item xs={12} sm={6} md={3} key={idx}>
-                        <Paper sx={{ p: 3, height: '100%', borderRadius: 3, position: 'relative', borderLeft: '4px solid', borderColor: 'primary.main' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
-                                <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                    {item.step}
-                                </Avatar>
-                                <Typography variant="subtitle1" fontWeight="bold">{item.title}</Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary">
-                                {item.desc}
-                            </Typography>
-                        </Paper>
+            {/* Quick Actions Row */}
+            <Box>
+                <Typography variant="h5" fontWeight="800" sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ width: 8, height: 24, bgcolor: 'secondary.main', borderRadius: 4 }} />
+                    Quick Access
+                </Typography>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={4}>
+                        <ActionCard
+                            title="New Observation"
+                            desc="Log field data now"
+                            icon={<AddIcon />}
+                            to="/dashboard"
+                            color={theme.palette.primary.main}
+                        />
                     </Grid>
-                ))}
-            </Grid>
-
-            {/* Bottom Row: Actions */}
-            <Typography variant="h6" fontWeight="700" sx={{ mb: 2 }}>Quick Access</Typography>
-            <Grid container spacing={2}>
-                <Grid item xs={4}>
-                    <ActionCard
-                        title="New Observation"
-                        desc="Record data"
-                        icon={<AddIcon />}
-                        to="/dashboard"
-                        color={theme.palette.primary.main}
-                    />
+                    <Grid item xs={12} md={4}>
+                        <ActionCard
+                            title="Field Intelligence"
+                            desc="View interactive map"
+                            icon={<MapIcon />}
+                            to="/map"
+                            color={theme.palette.secondary.main}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <ActionCard
+                            title="Advanced Analytics"
+                            desc="Review growth trends"
+                            icon={<DashboardIcon />}
+                            to="/dashboard"
+                            color={theme.palette.info.main}
+                        />
+                    </Grid>
                 </Grid>
-                <Grid item xs={4}>
-                    <ActionCard
-                        title="Field Map"
-                        desc="View map"
-                        icon={<MapIcon />}
-                        to="/map"
-                        color={theme.palette.secondary.main}
-                    />
-                </Grid>
-                <Grid item xs={4}>
-                    <ActionCard
-                        title="Analytics"
-                        desc="View trends"
-                        icon={<DashboardIcon />}
-                        to="/dashboard"
-                        color={theme.palette.info.main}
-                    />
-                </Grid>
-            </Grid>
+            </Box>
         </Container>
     );
 };

@@ -28,6 +28,13 @@ class DashboardScreen extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             onPressed: appState.startSync,
           ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await appState.logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -56,13 +63,33 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               Text(
-                'Welcome',
+                'Welcome, ${appState.user?['username'] ?? 'User'}',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
+              
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                ),
+                child: Text(
+                  appState.userRole ?? 'Unknown Role',
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               Text(
                 'Collect accurate crop observations for your estates.',

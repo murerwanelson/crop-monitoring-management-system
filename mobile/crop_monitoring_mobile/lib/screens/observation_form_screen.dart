@@ -36,7 +36,9 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   /* ================= TEXT CONTROLLERS ================= */
 
   final _collectorCtrl = TextEditingController();
+  final _fieldNameCtrl = TextEditingController();
   final _cropCtrl = TextEditingController();
+
   final _heightCtrl = TextEditingController();
   final _stalkCtrl = TextEditingController();
   final _leavesCtrl = TextEditingController();
@@ -83,9 +85,36 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   /* ================= LOCATION ================= */
 
   Future<void> _getLocation() async {
-    if (!await Permission.location.request().isGranted) return;
-    _position = await Geolocator.getCurrentPosition();
-    setState(() {});
+    if (!await Permission.location.request().isGranted) {
+       _snack('Location permission denied');
+       return;
+    }
+    
+    // Show loading indicator if needed or just snack
+    _snack('Getting location...');
+
+    try {
+      _position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10)
+      );
+      
+      if (mounted) {
+        setState(() {});
+        if (_position != null) {
+           _mapController.move(LatLng(_position!.latitude, _position!.longitude), 16);
+           _snack('Location updated');
+           
+           // Auto-fetch weather
+           final weather = await _api.getWeather(_position!.latitude, _position!.longitude);
+           if (weather.isNotEmpty && _weatherCtrl.text.isEmpty) {
+             setState(() => _weatherCtrl.text = weather);
+           }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      _snack('Could not get location. Check GPS.');
+    }
   }
 
   /* ================= DRAFT AUTOSAVE ================= */
@@ -340,6 +369,23 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_validatePolygon()) return;
 
+    // Strict validation for Crop Management
+    if (_sprayed && _pesticideCtrl.text.trim().isEmpty) {
+      _snack('Please enter the Type of Pesticide used');
+      return;
+    }
+
+    if (_fertilized) {
+      if (_fertilizerCtrl.text.trim().isEmpty) {
+        _snack('Please enter the Type of Fertilizer applied');
+        return;
+      }
+      if (_fertDate == null) {
+        _snack('Please select the Fertilizer Application Date');
+        return;
+      }
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -395,8 +441,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       if (appState.isOnline) {
         if (payload['field'] == null) {
           // Auto-create a field from the observation area
-          final fieldPayload = {
-            'field_id': 'AUTO_${DateTime.now().millisecondsSinceEpoch}',
+          final Map<String, dynamic> fieldPayload = {
             'location': {
               'type': 'Point',
               'coordinates': [_points.first.longitude, _points.first.latitude]
@@ -404,10 +449,33 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
             'boundary': polygon,
           };
           
+          // Use user provided name if available, otherwise auto-generate
+          if (_fieldNameCtrl.text.isNotEmpty) {
+             fieldPayload['field_id'] = _fieldNameCtrl.text;
+          }
+          
           final fieldResponse = await _api.authenticatedRequest('POST', '/fields/', body: fieldPayload);
           if (fieldResponse.statusCode == 201) {
             final fieldData = jsonDecode(fieldResponse.body);
             payload['field'] = fieldData['id'];
+          } else if (fieldResponse.statusCode == 400 && fieldResponse.body.contains("already exists")) {
+            // Field ID already exists - try to find and link to it
+            try {
+              final fields = await _api.getFields();
+              final existingField = fields.firstWhere(
+                (f) => f['field_id'].toString() == _fieldNameCtrl.text,
+                orElse: () => null,
+              );
+              
+              if (existingField != null) {
+                payload['field'] = existingField['id'];
+                _snack('Linked to existing field: ${_fieldNameCtrl.text}');
+              } else {
+                throw Exception('Field ID "${_fieldNameCtrl.text}" already exists but could not be retrieved.');
+              }
+            } catch (e) {
+               throw Exception('Failed to find existing field to link: $e');
+            }
           } else {
             throw Exception('Failed to create field: ${fieldResponse.body}');
           }
@@ -454,6 +522,10 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
             },
             'boundary': polygon,
           };
+           // Use user provided name if available
+           if (_fieldNameCtrl.text.isNotEmpty) {
+             fieldPayload['field_id'] = _fieldNameCtrl.text;
+           }
           await _localDb.insertField(fieldPayload);
           
           // For now, we'll mark this observation as needing a field link
@@ -514,9 +586,13 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
             _sectionCard(
               title: 'Field Details',
               children: [
+                if (widget.fieldId == null) ...[
+                   _field('Field Name / ID', _fieldNameCtrl, icon: Icons.map),
+                   const SizedBox(height: 12),
+                ],
                 _field('Collector *', _collectorCtrl, icon: Icons.person),
                 const SizedBox(height: 12),
-                _field('Crop Variety *', _cropCtrl, icon: Icons.grass),
+                _dateField('Date of Data Collection', _obsDate, (d) => setState(() => _obsDate = d)),
                 const SizedBox(height: 12),
                 _dateField('Planting Date', _plantingDate, (d) => setState(() => _plantingDate = d)),
                 const SizedBox(height: 12),
@@ -546,11 +622,35 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                 ),
                 if (_fertilized) ...[
                   const SizedBox(height: 8),
+                  _field('Type of Fertilizer Applied *', _fertilizerCtrl, icon: Icons.science),
                   const SizedBox(height: 12),
-                  _dateField('Application Date', _fertDate, (d) => setState(() => _fertDate = d)),
+                  _dateField('Application Date *', _fertDate, (d) => setState(() => _fertDate = d)),
                 ],
                 const SizedBox(height: 12),
-                _field('Weather Conditions', _weatherCtrl, icon: Icons.cloud),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _field('Weather Conditions', _weatherCtrl, icon: Icons.cloud)),
+                    if (_position != null)
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () async {
+                           _snack('Updating weather for ${_position!.latitude.toStringAsFixed(2)}, ${_position!.longitude.toStringAsFixed(2)}...');
+                           try {
+                             final w = await _api.getWeather(_position!.latitude, _position!.longitude);
+                             if (w.isNotEmpty) {
+                               setState(() => _weatherCtrl.text = w);
+                               _snack('Weather updated: $w');
+                             } else {
+                               _snack('Could not fetch weather. Check internet connection.');
+                             }
+                           } catch (e) {
+                             _snack('Error updating weather: $e');
+                           }
+                        },
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 _field('Watering Details', _wateringCtrl, icon: Icons.water),
               ],
@@ -671,12 +771,19 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                   ),
                   PolygonLayer(polygons: _polygons.toList()),
                   MarkerLayer(
-                    markers: _points
-                        .map((p) => Marker(
-                              point: p,
-                              child: const Icon(Icons.location_on, color: Colors.white, size: 20),
-                            ))
-                        .toList(),
+                    markers: [
+                      // User Location Marker
+                      if (_position != null)
+                        Marker(
+                          point: LatLng(_position!.latitude, _position!.longitude),
+                          child: const Icon(Icons.my_location, color: Colors.blue, size: 24),
+                        ),
+                      // Polygon Points Markers
+                      ..._points.map((p) => Marker(
+                            point: p,
+                            child: const Icon(Icons.location_on, color: Colors.red, size: 20),
+                          )),
+                    ],
                   ),
                 ],
               ),
@@ -706,6 +813,11 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: _points.isEmpty ? null : _clearPolygon,
                     tooltip: 'Clear',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.my_location, color: Colors.blue),
+                    onPressed: _getLocation,
+                    tooltip: 'My Location',
                   ),
                   IconButton(
                     icon: const Icon(Icons.fullscreen),

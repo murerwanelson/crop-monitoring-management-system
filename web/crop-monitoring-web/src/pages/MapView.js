@@ -14,10 +14,11 @@ import {
     MenuItem,
     TextField
 } from '@mui/material';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getFieldMapData } from '../services/api';
+import { useLocation } from 'react-router-dom';
 
 // Fix for default marker icons in React-Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -27,14 +28,38 @@ L.Icon.Default.mergeOptions({
     shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
+const ChangeView = ({ center, zoom }) => {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, zoom);
+    }, [center, zoom, map]);
+    return null;
+};
+
 const MapView = () => {
+    const location = useLocation();
     const [mapData, setMapData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [mapCenter, setMapCenter] = useState(location.state?.center || [-1.2921, 36.8219]); // Default Nairobi
+    const [zoom, setZoom] = useState(13);
 
     // Filters
     const [cropVariety, setCropVariety] = useState('All');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    useEffect(() => {
+        // Fly to user location if available
+        if (navigator.geolocation && !location.state?.center) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const { latitude, longitude } = pos.coords;
+                setMapCenter([latitude, longitude]);
+                setZoom(13);
+            }, (error) => {
+                console.log('Error getting location for map:', error);
+            });
+        }
+    }, []);
 
     useEffect(() => {
         loadMapData();
@@ -50,6 +75,19 @@ const MapView = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const loadMetrics = async () => {
+            if (mapData?.features?.length > 0 && !location.state?.center && mapCenter[0] === -1.2921) {
+                // If we loaded data and haven't set a specific center (geo or nav), center on first feature
+                // But if Geolocation is working, it might race. 
+                // Let's rely on Geolocation primarily if available for the "Both systems should pick my location" request.
+                // We will leave this solely for fallback if geo fails or data demands it.
+                // Actually, let's just let the Geolocation effect handle the "current location" requirement.
+            }
+        };
+        loadMetrics();
+    }, [mapData]);
 
     if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
 
@@ -73,10 +111,16 @@ const MapView = () => {
 
     if (filteredFeatures.length > 0) {
         const firstFeature = filteredFeatures[0];
-        if (firstFeature.geometry && firstFeature.geometry.coordinates) {
-            center = [firstFeature.geometry.coordinates[1], firstFeature.geometry.coordinates[0]];
-        } else if (firstFeature.properties.location && firstFeature.properties.location.coordinates) {
-            center = [firstFeature.properties.location.coordinates[1], firstFeature.properties.location.coordinates[0]];
+        const geometry = firstFeature.geometry || firstFeature.properties?.location;
+
+        if (geometry && geometry.coordinates) {
+            if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates[0]) && Array.isArray(geometry.coordinates[0][0])) {
+                // Use the first point of the first ring: [lng, lat]
+                const firstPoint = geometry.coordinates[0][0];
+                center = [firstPoint[1], firstPoint[0]]; // Leaflet uses [lat, lng]
+            } else if (geometry.type === 'Point' && Array.isArray(geometry.coordinates)) {
+                center = [geometry.coordinates[1], geometry.coordinates[0]];
+            }
         }
     }
 
@@ -149,7 +193,8 @@ const MapView = () => {
             </Paper>
 
             <Paper elevation={3} sx={{ height: '70vh', width: '100%', mb: 4, borderRadius: 2, overflow: 'hidden' }}>
-                <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={mapCenter} zoom={zoom} style={{ height: '100%', width: '100%' }}>
+                    <ChangeView center={mapCenter} zoom={zoom} />
                     <LayersControl position="topright">
                         <LayersControl.BaseLayer checked name="Satellite (Esri)">
                             <TileLayer

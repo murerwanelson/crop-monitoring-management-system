@@ -36,7 +36,8 @@ import {
     Layers,
     Add,
 } from '@mui/icons-material';
-import { getFields } from '../services/api';
+import { getFields, createField, updateField, deleteField } from '../services/api';
+import { TextField, Snackbar, Alert } from '@mui/material';
 
 const FieldManagement = () => {
     const theme = useTheme();
@@ -44,6 +45,14 @@ const FieldManagement = () => {
     const [loading, setLoading] = useState(true);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
+
+    // Form and Delete States
+    const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [currentField, setCurrentField] = useState(null); // null means create mode
+    const [formData, setFormData] = useState({ field_id: '', latitude: '', longitude: '' });
+    const [submitting, setSubmitting] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
         loadFields();
@@ -68,6 +77,66 @@ const FieldManagement = () => {
         if (!selectedFile) return;
         alert(`Importing ${selectedFile.name}... (Integration in progress)`);
         setImportDialogOpen(false);
+    };
+
+    const handleOpenFieldDialog = (field = null) => {
+        if (field) {
+            setCurrentField(field);
+            setFormData({
+                field_id: field.field_id,
+                latitude: field.location.coordinates[1],
+                longitude: field.location.coordinates[0],
+            });
+        } else {
+            setCurrentField(null);
+            setFormData({ field_id: '', latitude: '', longitude: '' });
+        }
+        setFieldDialogOpen(true);
+    };
+
+    const handleFieldSubmit = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            const data = {
+                field_id: formData.field_id,
+                location: {
+                    type: 'Point',
+                    coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)]
+                }
+            };
+
+            if (currentField) {
+                await updateField(currentField.id, data);
+                setSnackbar({ open: true, message: 'Field updated successfully', severity: 'success' });
+            } else {
+                await createField(data);
+                setSnackbar({ open: true, message: 'Field created successfully', severity: 'success' });
+            }
+            setFieldDialogOpen(false);
+            loadFields();
+        } catch (error) {
+            console.error('Error saving field:', error);
+            setSnackbar({ open: true, message: 'Failed to save field', severity: 'error' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!currentField) return;
+        setSubmitting(true);
+        try {
+            await deleteField(currentField.id);
+            setSnackbar({ open: true, message: 'Field deleted successfully', severity: 'success' });
+            setDeleteDialogOpen(false);
+            loadFields();
+        } catch (error) {
+            console.error('Error deleting field:', error);
+            setSnackbar({ open: true, message: 'Failed to delete field', severity: 'error' });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     if (loading) {
@@ -105,6 +174,7 @@ const FieldManagement = () => {
                     <Button
                         variant="contained"
                         startIcon={<Add />}
+                        onClick={() => handleOpenFieldDialog()}
                         sx={{ borderRadius: 3, px: 3, py: 1.2 }}
                     >
                         Create New Field
@@ -216,12 +286,23 @@ const FieldManagement = () => {
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="Edit Details">
-                                            <IconButton size="small" sx={{ bgcolor: '#F8FAFC' }}>
+                                            <IconButton
+                                                size="small"
+                                                sx={{ bgcolor: '#F8FAFC' }}
+                                                onClick={() => handleOpenFieldDialog(field)}
+                                            >
                                                 <EditIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="Delete Field">
-                                            <IconButton size="small" sx={{ color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.05), '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) } }}>
+                                            <IconButton
+                                                size="small"
+                                                sx={{ color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.05), '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) } }}
+                                                onClick={() => {
+                                                    setCurrentField(field);
+                                                    setDeleteDialogOpen(true);
+                                                }}
+                                            >
                                                 <DeleteIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
@@ -291,6 +372,110 @@ const FieldManagement = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Field Form Dialog */}
+            <Dialog
+                open={fieldDialogOpen}
+                onClose={() => !submitting && setFieldDialogOpen(false)}
+                PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: 500 } }}
+            >
+                <form onSubmit={handleFieldSubmit}>
+                    <DialogTitle sx={{ fontWeight: 800, fontSize: '1.5rem' }}>
+                        {currentField ? 'Edit Field' : 'Create New Field'}
+                    </DialogTitle>
+                    <DialogContent>
+                        <Stack spacing={3} sx={{ mt: 1 }}>
+                            <TextField
+                                label="Field Identifier"
+                                fullWidth
+                                required
+                                value={formData.field_id}
+                                onChange={(e) => setFormData({ ...formData, field_id: e.target.value })}
+                                placeholder="e.g. Field-A1"
+                            />
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="Latitude"
+                                        type="number"
+                                        fullWidth
+                                        required
+                                        inputProps={{ step: "any" }}
+                                        value={formData.latitude}
+                                        onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="Longitude"
+                                        type="number"
+                                        fullWidth
+                                        required
+                                        inputProps={{ step: "any" }}
+                                        value={formData.longitude}
+                                        onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button
+                            onClick={() => setFieldDialogOpen(false)}
+                            disabled={submitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={submitting}
+                            sx={{ borderRadius: 3, px: 4 }}
+                        >
+                            {submitting ? <CircularProgress size={24} /> : 'Save Field'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => !submitting && setDeleteDialogOpen(false)}
+                PaperProps={{ sx: { borderRadius: 4 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Delete Field</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete field <strong>{currentField?.field_id}</strong>?
+                        This action cannot be undone and will delete all associated observations.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setDeleteDialogOpen(false)} disabled={submitting}>Cancel</Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        variant="contained"
+                        disabled={submitting}
+                        sx={{ borderRadius: 3 }}
+                    >
+                        {submitting ? <CircularProgress size={24} /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Global Snackbar */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert severity={snackbar.severity} variant="filled" sx={{ width: '100%', borderRadius: 3 }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };

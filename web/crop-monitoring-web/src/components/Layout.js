@@ -23,6 +23,7 @@ import {
     Logout as LogoutIcon,
     Menu as MenuIcon,
     NaturePeople as LogoIcon,
+    Group as UsersIcon,
 } from '@mui/icons-material';
 
 const menuItems = [
@@ -32,6 +33,7 @@ const menuItems = [
     { text: 'Map View', icon: <MapIcon />, path: '/map' },
     { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
     { text: 'Field Management', icon: <LogoIcon />, path: '/fields' },
+    { text: 'User Management', icon: <UsersIcon />, path: '/users', adminOnly: true },
 ];
 
 const Layout = ({ children }) => {
@@ -69,40 +71,67 @@ const Layout = ({ children }) => {
         handleCloseNavMenu();
     };
 
+    const filteredMenuItems = menuItems.filter(item => {
+        if (item.adminOnly) {
+            return user?.role === 'ADMIN';
+        }
+        return true;
+    });
+
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
-            <AppBar position="fixed" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
+            <AppBar
+                position="fixed"
+                elevation={0}
+                className="glass-effect"
+                sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.7)',
+                    borderBottom: '1px solid rgba(0,0,0,0.05)',
+                }}
+            >
                 <Container maxWidth="xl">
-                    <Toolbar disableGutters>
+                    <Toolbar disableGutters sx={{ minHeight: { xs: 64, md: 80 } }}>
                         {/* DESKTOP LOGO */}
-                        <LogoIcon sx={{ display: { xs: 'none', md: 'flex' }, mr: 1, color: 'primary.main', fontSize: 32 }} />
-                        <Typography
-                            variant="h5"
-                            noWrap
-                            component={Link}
-                            to="/"
-                            sx={{
-                                mr: 4,
-                                display: { xs: 'none', md: 'flex' },
-                                fontWeight: 800,
-                                letterSpacing: '-0.5px',
-                                color: 'primary.dark',
-                                textDecoration: 'none',
-                                alignItems: 'center',
-                            }}
-                        >
-                            CROP MONITOR
-                        </Typography>
+                        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mr: 4 }}>
+                            <Box
+                                sx={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: '12px',
+                                    bgcolor: 'primary.main',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    mr: 1.5,
+                                    boxShadow: '0 8px 16px -4px rgba(16, 185, 129, 0.3)'
+                                }}
+                            >
+                                <LogoIcon sx={{ color: 'white', fontSize: 24 }} />
+                            </Box>
+                            <Typography
+                                variant="h6"
+                                noWrap
+                                component={Link}
+                                to="/"
+                                sx={{
+                                    fontWeight: 800,
+                                    letterSpacing: '-0.02em',
+                                    color: 'text.primary',
+                                    textDecoration: 'none',
+                                    fontSize: '1.25rem'
+                                }}
+                            >
+                                CROP<span style={{ color: '#10B981' }}>MONITOR</span>
+                            </Typography>
+                        </Box>
 
-                        {/* MOBILE MENU ITEMS */}
+                        {/* MOBILE MENU MODAL */}
                         <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
                             <IconButton
                                 size="large"
-                                aria-label="account of current user"
-                                aria-controls="menu-appbar"
-                                aria-haspopup="true"
                                 onClick={handleOpenNavMenu}
-                                color="primary"
+                                color="inherit"
+                                sx={{ color: 'text.primary' }}
                             >
                                 <MenuIcon />
                             </IconButton>
@@ -115,37 +144,45 @@ const Layout = ({ children }) => {
                                 open={Boolean(anchorElNav)}
                                 onClose={handleCloseNavMenu}
                                 sx={{ display: { xs: 'block', md: 'none' } }}
+                                PaperProps={{
+                                    sx: { borderRadius: 3, mt: 1.5, minWidth: 200, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }
+                                }}
                             >
-                                {menuItems.map((item) => (
-                                    <MenuItem key={item.text} onClick={() => handleNavigation(item.path)}>
-                                        <Typography textAlign="center">{item.text}</Typography>
+                                {filteredMenuItems.map((item) => (
+                                    <MenuItem key={item.text} onClick={() => handleNavigation(item.path)} sx={{ py: 1.5 }}>
+                                        <Box sx={{ mr: 2, display: 'flex', color: location.pathname === item.path ? 'primary.main' : 'text.secondary' }}>
+                                            {item.icon}
+                                        </Box>
+                                        <Typography fontWeight={location.pathname === item.path ? 700 : 500}>
+                                            {item.text}
+                                        </Typography>
                                     </MenuItem>
                                 ))}
                             </Menu>
                         </Box>
 
                         {/* MOBILE LOGO */}
-                        <LogoIcon sx={{ display: { xs: 'flex', md: 'none' }, mr: 1, color: 'primary.main' }} />
-                        <Typography
-                            variant="h6"
-                            noWrap
-                            component={Link}
-                            to="/"
-                            sx={{
-                                mr: 2,
-                                display: { xs: 'flex', md: 'none' },
-                                flexGrow: 1,
-                                fontWeight: 700,
-                                color: 'primary.dark',
-                                textDecoration: 'none',
-                            }}
-                        >
-                            MONITOR
-                        </Typography>
+                        <Box sx={{ display: { xs: 'flex', md: 'none' }, flexGrow: 1, alignItems: 'center' }}>
+                            <LogoIcon sx={{ mr: 1, color: 'primary.main' }} />
+                            <Typography
+                                variant="h6"
+                                noWrap
+                                component={Link}
+                                to="/"
+                                sx={{
+                                    fontWeight: 700,
+                                    color: 'text.primary',
+                                    textDecoration: 'none',
+                                    fontSize: '1.1rem'
+                                }}
+                            >
+                                MONITOR
+                            </Typography>
+                        </Box>
 
-                        {/* DESKTOP MENU ITEMS - LEFT ALIGNED */}
-                        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-start', ml: 4, gap: 1 }}>
-                            {menuItems.map((item) => {
+                        {/* DESKTOP MENU ITEMS */}
+                        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, gap: 0.5 }}>
+                            {filteredMenuItems.map((item) => {
                                 const isSelected = location.pathname === item.path;
                                 return (
                                     <Button
@@ -153,18 +190,27 @@ const Layout = ({ children }) => {
                                         onClick={() => handleNavigation(item.path)}
                                         startIcon={item.icon}
                                         sx={{
-                                            my: 2,
-                                            color: isSelected ? 'primary.contrastText' : 'text.secondary',
-                                            bgcolor: isSelected ? 'primary.main' : 'transparent',
-                                            display: 'flex',
+                                            color: isSelected ? 'primary.main' : 'text.secondary',
                                             fontWeight: isSelected ? 700 : 500,
                                             px: 2,
-                                            borderRadius: 2,
+                                            py: 1,
+                                            borderRadius: '12px',
+                                            position: 'relative',
                                             '&:hover': {
-                                                bgcolor: isSelected ? 'primary.dark' : 'action.hover',
-                                                color: isSelected ? 'white' : 'primary.main',
+                                                bgcolor: 'rgba(16, 185, 129, 0.04)',
+                                                color: 'primary.main',
                                             },
-                                            transition: 'all 0.2s',
+                                            '&::after': isSelected ? {
+                                                content: '""',
+                                                position: 'absolute',
+                                                bottom: 2,
+                                                left: '20%',
+                                                right: '20%',
+                                                height: '3px',
+                                                bgcolor: 'primary.main',
+                                                borderRadius: '10px'
+                                            } : {},
+                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                         }}
                                     >
                                         {item.text}
@@ -175,18 +221,35 @@ const Layout = ({ children }) => {
 
                         {/* USER SETTINGS */}
                         <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ display: { xs: 'none', md: 'block' }, textAlign: 'right' }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-                                    {user?.username || 'Admin User'}
+                            <Box sx={{ display: { xs: 'none', lg: 'block' }, textAlign: 'right' }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2, color: 'text.primary' }}>
+                                    {user?.username || 'Field Manager'}
                                 </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {user?.role || 'Field Manager'}
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                    {user?.role || 'Staff'}
                                 </Typography>
                             </Box>
 
-                            <Tooltip title="Open settings">
-                                <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                                    <Avatar sx={{ bgcolor: 'secondary.main', color: 'white', fontWeight: 'bold' }}>
+                            <Tooltip title="Account settings">
+                                <IconButton
+                                    onClick={handleOpenUserMenu}
+                                    sx={{
+                                        p: '4px',
+                                        border: '2px solid',
+                                        borderColor: 'divider',
+                                        '&:hover': { borderColor: 'primary.light' }
+                                    }}
+                                >
+                                    <Avatar
+                                        sx={{
+                                            bgcolor: 'primary.main',
+                                            width: 34,
+                                            height: 34,
+                                            fontSize: '0.9rem',
+                                            fontWeight: 800,
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                        }}
+                                    >
                                         {user?.username?.charAt(0).toUpperCase() || 'A'}
                                     </Avatar>
                                 </IconButton>
@@ -200,10 +263,17 @@ const Layout = ({ children }) => {
                                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                                 open={Boolean(anchorElUser)}
                                 onClose={handleCloseUserMenu}
+                                PaperProps={{
+                                    sx: { borderRadius: 3, minWidth: 180, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }
+                                }}
                             >
-                                <MenuItem onClick={handleLogout}>
-                                    <LogoutIcon sx={{ mr: 2, fontSize: 20, color: 'text.secondary' }} />
-                                    <Typography textAlign="center">Logout</Typography>
+                                <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: { lg: 'none' } }}>
+                                    <Typography variant="subtitle2" fontWeight={700}>{user?.username}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{user?.role}</Typography>
+                                </Box>
+                                <MenuItem onClick={handleLogout} sx={{ py: 1.5 }}>
+                                    <LogoutIcon sx={{ mr: 2, fontSize: 20, color: 'error.main' }} />
+                                    <Typography fontWeight={600} color="error.main">Logout</Typography>
                                 </MenuItem>
                             </Menu>
                         </Box>
@@ -212,7 +282,16 @@ const Layout = ({ children }) => {
             </AppBar>
 
             {/* MAIN CONTENT OFFSET */}
-            <Box component="main" sx={{ flexGrow: 1, pt: { xs: 8, md: 10 }, pb: 4 }}>
+            <Box
+                component="main"
+                className="animate-fade-in"
+                sx={{
+                    flexGrow: 1,
+                    pt: { xs: 10, md: 14 },
+                    pb: 6,
+                    px: { xs: 2, sm: 3, md: 4 }
+                }}
+            >
                 {children}
             </Box>
         </Box>

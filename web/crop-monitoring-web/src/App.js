@@ -9,6 +9,7 @@ import Observations from './pages/Observations';
 import Analytics from './pages/Analytics';
 import MapView from './pages/MapView';
 import FieldManagement from './pages/FieldManagement';
+import Users from './pages/Users';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
@@ -149,6 +150,16 @@ function AppRoutes() {
           <PrivateRoute>
             <Layout>
               <FieldManagement />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Users />
             </Layout>
           </PrivateRoute>
         }
