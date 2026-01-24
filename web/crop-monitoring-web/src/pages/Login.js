@@ -49,7 +49,7 @@ const Login = () => {
         const success = await login(username, password);
 
         if (success) {
-            navigate('/');
+            navigate('/map');
         } else {
             setError('Invalid username or password');
         }
@@ -162,11 +162,12 @@ const Login = () => {
                             <Box component="form" onSubmit={handleSubmit}>
                                 <TextField
                                     fullWidth
-                                    label="Username"
+                                    label="Email or Surname"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     margin="normal"
                                     required
+                                    placeholder="Enter your registered email or surname"
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">

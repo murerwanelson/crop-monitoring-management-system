@@ -21,10 +21,18 @@ class SyncService {
     for (var field in unsynced) {
       Map<String, dynamic> data = jsonDecode(field['data']);
       try {
+        print('Sync: Uploading offline field ${field['id']} (${data['field_id']})...');
         await api.createField(data);
         await localDb.markFieldAsSynced(field['id']);
+        print('Sync: Field ${field['id']} synced successfully.');
       } catch (e) {
-        print('Field sync failed for id ${field['id']}: $e');
+        final errorStr = e.toString();
+        print('Sync: Field sync failed for id ${field['id']}: $errorStr');
+        
+        if (errorStr.contains('400') || errorStr.contains('already exists')) {
+          print('Sync: Field already exists on server. Marking as synced.');
+          await localDb.markFieldAsSynced(field['id']);
+        }
       }
     }
   }
@@ -45,22 +53,46 @@ class SyncService {
       Map<String, dynamic> data = jsonDecode(obs['data']);
       
       try {
-        // Resolve field if it was saved with a temp_field_id offline
-        if (data['field'] == null && data['temp_field_id'] != null) {
+        if (data['field'] == null && data['temp_field_id'] == null) {
+          print('Sync: Observation ${obs['id']} is orphaned (no field). Checking for existing "Default Field" locally...');
+          data['temp_field_id'] = 'Default Field';
+          
+          final localFields = await localDb.getUnsyncedFields();
+          final existsLocally = localFields.any((f) {
+            try {
+              return jsonDecode(f['data'])['field_id'] == 'Default Field';
+            } catch (_) { return false; }
+          });
+
+          if (!existsLocally) {
+            print('Sync: Creating local "Default Field" for orphaned records...');
+            await localDb.insertField({
+              'field_id': 'Default Field',
+              'location': {'type': 'Point', 'coordinates': [0.0, 0.0]},
+              'boundary': data['observation_area'],
+            });
+          }
+          // Refresh field list to include the newly identified field
+          allFields = await api.getFields();
+        }
+
+        if (data['field'] == null) {
+          print('Sync: Resolving temporary field link for observation ${obs['id']} (${data['temp_field_id']})...');
           final serverField = allFields.firstWhere(
-            (f) => f['field_id'] == data['temp_field_id'],
+            (f) => f['field_id'].toString() == data['temp_field_id'].toString(),
             orElse: () => null,
           );
           if (serverField != null) {
             data['field'] = serverField['id'];
+            print('Sync: Resolved to server field ID ${serverField['id']}');
           } else {
-            print('Sync Warning: Could not find server field for ${data['temp_field_id']}. Skipping observation ${obs['id']} for now.');
+            print('Sync Warning: Could not find server field for "${data['temp_field_id']}". Server fields: ${allFields.map((f)=>f['field_id']).toList()}. Skipping for now.');
             continue;
           }
         }
 
         if (data['field'] == null) {
-          print('Sync Error: Observation ${obs['id']} has no field assigned. Skipping.');
+          print('Sync Error: Observation ${obs['id']} has no field assigned (field=null, temp_field_id=${data['temp_field_id']}). Skipping.');
           continue;
         }
 
@@ -70,6 +102,35 @@ class SyncService {
         final double? lon = data['offline_lon'];
         
         final apiPayload = Map<String, dynamic>.from(data);
+
+        // --- Data Sanitization for Backend Compatibility ---
+        
+        // 1. Sanitize Crop Management (Pesticide/Fertilizer)
+        if (apiPayload['crop_management'] != null) {
+          final cm = Map<String, dynamic>.from(apiPayload['crop_management']);
+          // Handle legacy key 'pesticide_type' vs 'pesticide_used'
+          final legacyPesticide = cm.remove('pesticide_type');
+          cm['pesticide_used'] = cm['pesticide_used'] ?? legacyPesticide ?? "";
+          cm['fertilizer_type'] = cm['fertilizer_type'] ?? "";
+          cm['weather'] = cm['weather'] ?? "";
+          cm['watering'] = cm['watering'] ?? "";
+          apiPayload['crop_management'] = cm;
+        }
+
+        // 2. Sanitize Crop Measurements (Legacy Keys)
+        if (apiPayload['crop_measurement'] != null) {
+          final cm = Map<String, dynamic>.from(apiPayload['crop_measurement']);
+          // Handle 'stalk_diameter_mm' -> 'stalk_diameter'
+          if (cm.containsKey('stalk_diameter_mm')) {
+            cm['stalk_diameter'] = cm.remove('stalk_diameter_mm');
+          }
+          // Handle 'green_leaves' -> 'number_of_leaves'
+          if (cm.containsKey('green_leaves')) {
+            cm['number_of_leaves'] = cm.remove('green_leaves');
+          }
+          apiPayload['crop_measurement'] = cm;
+        }
+
         apiPayload.remove('temp_field_id');
         apiPayload.remove('offline_images');
         apiPayload.remove('offline_lat');

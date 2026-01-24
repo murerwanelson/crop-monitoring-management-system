@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/observations_list_screen.dart';
 import 'screens/observation_form_screen.dart';
 import 'screens/observation_detail_screen.dart';
 import 'screens/field_form_screen.dart';
 import 'screens/about_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'screens/field_map_hub_screen.dart';
 import 'providers/app_state.dart';
 
 void main() {
@@ -67,11 +71,15 @@ class MyApp extends StatelessWidget {
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/home': (context) => const ObservationsListScreen(),
         '/add-observation': (context) => const ObservationFormScreen(),
         '/add-field': (context) => const FieldFormScreen(),
         '/about': (context) => const AboutScreen(),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/analytics': (context) => const AnalyticsScreen(),
+        '/map-hub': (context) => const FieldMapHubScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/observation-detail') {

@@ -11,8 +11,8 @@ import {
     Avatar,
     Paper,
     Divider,
-    useTheme,
     alpha,
+    useTheme,
 } from '@mui/material';
 import {
     TrendingUp,
@@ -21,7 +21,6 @@ import {
     Timeline,
     BarChart as BarChartIcon,
     PieChart as PieChartIcon,
-    Update,
 } from '@mui/icons-material';
 import {
     LineChart,
@@ -43,7 +42,6 @@ import { getDashboardStats, getMoistureTrends } from '../services/api';
 const COLORS = ['#6366F1', '#22C55E', '#F59E0B', '#EF4444', '#0EA5E9'];
 
 const StatCard = ({ icon, label, value, color, description }) => {
-    const theme = useTheme();
     return (
         <Card
             sx={{
@@ -58,7 +56,6 @@ const StatCard = ({ icon, label, value, color, description }) => {
                 '&:hover': {
                     transform: 'translateY(-6px)',
                     boxShadow: `0 24px 36px -8px ${alpha(color, 0.12)}, 0 12px 14px -8px ${alpha(color, 0.08)}`,
-                    borderColor: alpha(color, 0.2),
                 },
             }}
             elevation={0}
@@ -128,10 +125,34 @@ const ChartWrapper = ({ title, icon, children }) => {
     );
 };
 
+const AlertsCard = ({ alerts }) => {
+    return (
+        <Card sx={{ borderRadius: 6, p: 2, border: '1px solid rgba(0,0,0,0.05)' }} elevation={0}>
+            <CardContent>
+                <Typography variant="h6" fontWeight={700} gutterBottom>
+                    Alerts & Notifications
+                </Typography>
+                {alerts.length > 0 ? (
+                    alerts.map((alert, index) => (
+                        <Typography key={index} variant="body2" color="text.secondary" gutterBottom>
+                            {alert.message}
+                        </Typography>
+                    ))
+                ) : (
+                    <Typography variant="body2" color="text.secondary">
+                        No alerts at the moment.
+                    </Typography>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 export default function Dashboard() {
     const theme = useTheme();
     const [stats, setStats] = useState(null);
     const [moisture, setMoisture] = useState([]);
+    const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -151,6 +172,7 @@ export default function Dashboard() {
                             moisture: parseFloat(d.avg_moisture).toFixed(1),
                         }))
                 );
+                setAlerts(statsData.alerts || []);
             } catch (err) {
                 console.error('Dashboard load failed:', err);
             } finally {
@@ -379,6 +401,10 @@ export default function Dashboard() {
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartWrapper>
+                </Grid>
+
+                <Grid item xs={12} lg={4}>
+                    <AlertsCard alerts={alerts} />
                 </Grid>
             </Grid>
         </Container>

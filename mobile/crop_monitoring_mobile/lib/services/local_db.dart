@@ -156,4 +156,65 @@ class LocalDB {
       whereArgs: [key],
     );
   }
+
+  // Clear all data (observations, fields, drafts)
+  Future<void> clearAllData() async {
+    final dbClient = await db;
+    await dbClient.delete('observations');
+    await dbClient.delete('fields');
+    await dbClient.delete('drafts');
+  }
+
+  // --- Statistics Helpers ---
+
+  Future<int> getTotalRecordsCount() async {
+    final dbClient = await db;
+    final obsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM observations')) ?? 0;
+    final fieldsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM fields')) ?? 0;
+    return obsCount + fieldsCount;
+  }
+
+  Future<int> getSyncedRecordsCount() async {
+    final dbClient = await db;
+    final obsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM observations WHERE synced = 1')) ?? 0;
+    final fieldsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM fields WHERE synced = 1')) ?? 0;
+    return obsCount + fieldsCount;
+  }
+
+  Future<int> getUnsyncedRecordsCount() async {
+    final dbClient = await db;
+    final obsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM observations WHERE synced = 0')) ?? 0;
+    final fieldsCount = Sqflite.firstIntValue(await dbClient.rawQuery('SELECT COUNT(*) FROM fields WHERE synced = 0')) ?? 0;
+    return obsCount + fieldsCount;
+  }
+
+  Future<double> getLocalStorageSizeMB() async {
+    try {
+      // images are stored in the app's document directory by the image picker
+      // but since we keep paths in the DB, we should iterate over those or the whole directory
+      // For simplicity and accuracy of "Crop Photos", we'll check the directory where picked images go.
+      // ImagePicker usually puts them in cache.
+      
+      // Let's get the cache directory and check for images
+      final cacheDir = await getTemporaryDirectory();
+      int totalSize = 0;
+      
+      if (await cacheDir.exists()) {
+        final List<FileSystemEntity> files = cacheDir.listSync(recursive: true);
+        for (var file in files) {
+          if (file is File) {
+            final fileName = basename(file.path).toLowerCase();
+            if (fileName.contains('image_picker') || fileName.endsWith('.jpg') || fileName.endsWith('.png') || fileName.endsWith('.jpeg')) {
+              totalSize += await file.length();
+            }
+          }
+        }
+      }
+      
+      return totalSize / (1024 * 1024); // Convert to MB
+    } catch (e) {
+      print('Error calculating storage size: $e');
+      return 0.0;
+    }
+  }
 }

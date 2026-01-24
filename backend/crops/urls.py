@@ -9,7 +9,9 @@ from .views import (
     StatsViewSet,
     RegisterView,
     UserViewSet,
-    AuditLogViewSet
+    AuditLogViewSet,
+    RequestPasswordResetView,
+    ResetPasswordView
 )
 
 router = DefaultRouter()
@@ -24,6 +26,8 @@ router.register(r'audit-logs', AuditLogViewSet)
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
+    path('password-reset/request/', RequestPasswordResetView.as_view(), name='password_reset_request'),
+    path('password-reset/confirm/', ResetPasswordView.as_view(), name='password_reset_confirm'),
     path('', include(router.urls)),
 ]
 

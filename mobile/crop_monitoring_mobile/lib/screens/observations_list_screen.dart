@@ -10,6 +10,7 @@ import '../providers/app_state.dart';
 import 'observation_detail_screen.dart';
 import 'observation_form_screen.dart';
 import 'field_form_screen.dart';
+import '../widgets/app_drawer.dart';
 
 class ObservationsListScreen extends StatefulWidget {
   const ObservationsListScreen({Key? key}) : super(key: key);
@@ -119,7 +120,10 @@ class _ObservationsListScreenState extends State<ObservationsListScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadObservations,
+            onPressed: () async {
+              await _loadObservations();
+              await appState.checkUnsynced();
+            },
           ),
         ],
         bottom: PreferredSize(
@@ -147,143 +151,131 @@ class _ObservationsListScreenState extends State<ObservationsListScreen> {
           ),
         ),
       ),
-      drawer: _buildDrawer(appState),
+      drawer: const AppDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _filteredObservations.isEmpty
-              ? _emptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadObservations,
-                  child: ListView.builder(
-                    itemCount: _filteredObservations.length,
-                    itemBuilder: (context, index) {
-                      final obs = _filteredObservations[index];
-                      final date = DateTime.tryParse(obs['observation_date'] ?? '');
-                      final coords = obs['observation_area']?['coordinates']?[0] ?? [];
-                      final areaM2 = _calculatePolygonArea(coords) * 1230000; // rough conversion
-                      final areaHa = areaM2 / 10000;
-                      final areaAcres = areaM2 / 4046.86;
-
-                      return Card(
-                        margin:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        child: ListTile(
-                          leading: Stack(
-                            alignment: Alignment.topRight,
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: Colors.green.shade100,
-                                child: const Icon(Icons.visibility, color: Colors.green),
-                              ),
-                              if (obs['offline'] == true)
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: CircleAvatar(
-                                    radius: 8,
-                                    backgroundColor: Colors.orange,
-                                    child: const Icon(Icons.cloud_off,
-                                        size: 12, color: Colors.white),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          title: Text(obs['crop_variety'] ?? 'Unknown Variety'),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Field: ${obs['field_id'] ?? 'N/A'}'),
-                              if (date != null)
-                                Text('Date: ${DateFormat('MMM dd, yyyy').format(date)}'),
-                              if (coords.isNotEmpty)
-                                Text(
-                                    'Area: ${areaHa.toStringAsFixed(2)} ha / ${areaAcres.toStringAsFixed(2)} acres'),
-                            ],
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          isThreeLine: true,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ObservationDetailScreen(
-                                      observationId: obs['id'],
-                                      isOffline: obs['offline'] == true,
-                                    ),
-                              ),
-                            );
+          : Column(
+              children: [
+                _buildStatusDashboard(appState),
+                Expanded(
+                  child: _filteredObservations.isEmpty
+                      ? _emptyState()
+                      : RefreshIndicator(
+                          onRefresh: () async {
+                            await _loadObservations();
+                            await appState.checkUnsynced();
                           },
+                          child: ListView.builder(
+                            itemCount: _filteredObservations.length,
+                            itemBuilder: (context, index) {
+                              final obs = _filteredObservations[index];
+                              final date = DateTime.tryParse(obs['observation_date'] ?? '');
+                              final coords = obs['observation_area']?['coordinates']?[0] ?? [];
+                              final areaM2 = _calculatePolygonArea(coords) * 1230000; // rough conversion
+                              final areaHa = areaM2 / 10000;
+                              final areaAcres = areaM2 / 4046.86;
+
+                              return Card(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                child: ListTile(
+                                  leading: Stack(
+                                    alignment: Alignment.topRight,
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: Colors.green.shade100,
+                                        child: const Icon(Icons.visibility, color: Colors.green),
+                                      ),
+                                      if (obs['offline'] == true)
+                                        Positioned(
+                                          right: -2,
+                                          top: -2,
+                                          child: CircleAvatar(
+                                            radius: 8,
+                                            backgroundColor: Colors.orange,
+                                            child: const Icon(Icons.cloud_off,
+                                                size: 12, color: Colors.white),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  title: Text(obs['crop_variety'] ?? 'Unknown Variety'),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Field: ${obs['field_id'] ?? 'N/A'}'),
+                                      if (date != null)
+                                        Text('Date: ${DateFormat('MMM dd, yyyy').format(date)}'),
+                                      if (coords.isNotEmpty)
+                                        Text(
+                                            'Area: ${areaHa.toStringAsFixed(2)} ha / ${areaAcres.toStringAsFixed(2)} acres'),
+                                    ],
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  isThreeLine: true,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            ObservationDetailScreen(
+                                              observationId: obs['id'],
+                                              isOffline: obs['offline'] == true,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      );
-                    },
-                  ),
                 ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const ObservationFormScreen()))
-              .then((_) => _loadObservations());
+              .then((_) {
+                _loadObservations();
+                appState.checkUnsynced();
+              });
         },
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Drawer _buildDrawer(AppState appState) {
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+  Widget _buildStatusDashboard(AppState appState) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border(bottom: BorderSide(color: Colors.green.shade100)),
+      ),
+      child: Row(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.eco, color: Colors.white, size: 48),
-                const SizedBox(height: 10),
-                const Text('Crop Monitoring',
-                    style: TextStyle(color: Colors.white, fontSize: 20)),
-                Text(
-                  appState.isAuthenticated ? 'Logged in as collector' : 'Guest',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ],
+          // Sync Progress Card
+          Expanded(
+            child: _StatusCard(
+              title: 'Sync Status',
+              icon: Icons.sync_rounded,
+              label: '${appState.syncedCount} / ${appState.totalRecords} done',
+              color: Colors.green,
+              progress: appState.totalRecords == 0 ? 0 : appState.syncedCount / appState.totalRecords,
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.list),
-            title: const Text('Observations'),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add_location),
-            title: const Text('Add New Field'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const FieldFormScreen()))
-                  .then((_) => _loadObservations());
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.add_circle_outline),
-            title: const Text('New Observation'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ObservationFormScreen()))
-                  .then((_) => _loadObservations());
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
-            onTap: () async {
-              await appState.logout();
-              Navigator.pop(context);
-            },
+          const SizedBox(width: 12),
+          // Storage Info Card
+          Expanded(
+            child: _StatusCard(
+              title: 'Photo Storage',
+              icon: Icons.sd_storage_rounded,
+              label: '${appState.storageSizeMB.toStringAsFixed(1)} MB used',
+              color: Colors.blue,
+              iconColor: Colors.blue.shade700,
+            ),
           ),
         ],
       ),
@@ -304,6 +296,82 @@ class _ObservationsListScreenState extends State<ObservationsListScreen> {
             onPressed: _loadObservations,
             child: const Text('Refresh'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color? iconColor;
+  final double? progress;
+
+  const _StatusCard({
+    required this.title,
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.iconColor,
+    this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: iconColor ?? color),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: color.withOpacity(0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 4,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -4,13 +4,27 @@ from django.contrib.gis.db import models
 
 class UserProfile(models.Model):
     ROLE_CHOICES = [
-        ('FIELD_COLLECTOR', 'Field Collector'),
-        ('SUPERVISOR', 'Supervisor'),
-        ('ADMIN', 'Admin'),
+        ('ADMIN', 'Administrator'),
+        ('FIELD_MANAGER', 'Field Manager'),
+        ('FIELD_COLLECTOR', 'Field Collector'),  # Primary role for field workers
+        ('VIEWER', 'Viewer'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    role = models.CharField(max_length=30, choices=ROLE_CHOICES)
+    role = models.CharField(
+        max_length=20, 
+        choices=ROLE_CHOICES,
+        default='FIELD_COLLECTOR'  # All new users default to Field Collector
+    )
+    permissions = models.JSONField(
+        default=list,  # Default permissions assigned on registration
+        help_text='Array of permissions like ["write_logs", "upload_gps", "access_camera"]'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether the user has access to the system'
+    )
+    assigned_fields = models.ManyToManyField('Field', blank=True)
 
 
 class Field(models.Model):
@@ -72,4 +86,16 @@ class AuditLog(models.Model):
     def __str__(self):
         return f"{self.user} - {self.action} - {self.timestamp}"
 
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token = models.CharField(max_length=6, unique=True) # 6-digit OTP for simplicity in mobile
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"{self.user.username} - {self.token}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at

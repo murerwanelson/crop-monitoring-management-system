@@ -5,22 +5,21 @@ import '../utils/app_colors.dart';
 import '../utils/app_animations.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/modern_text_field.dart';
-import '../screens/forgot_password_screen.dart';
 import '../widgets/wave_clipper.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
+class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _rememberMe = false;
   late AnimationController _animController;
   late List<Animation<double>> _fadeAnimations;
   late List<Animation<Offset>> _slideAnimations;
@@ -29,19 +28,19 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _animController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1400),
       vsync: this,
     );
 
-    // Create staggered fade and slide animations for form elements
+    // Create staggered animations for form elements
     _fadeAnimations = List.generate(
-      5,
+      7,
       (index) => Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _animController,
           curve: Interval(
-            index * 0.15,
-            0.5 + (index * 0.15),
+            index * 0.12,
+            0.5 + (index * 0.12),
             curve: Curves.easeOut,
           ),
         ),
@@ -49,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     _slideAnimations = List.generate(
-      5,
+      7,
       (index) => Tween<Offset>(
         begin: const Offset(0, 0.3),
         end: Offset.zero,
@@ -57,8 +56,8 @@ class _LoginScreenState extends State<LoginScreen>
         CurvedAnimation(
           parent: _animController,
           curve: Interval(
-            index * 0.15,
-            0.5 + (index * 0.15),
+            index * 0.12,
+            0.5 + (index * 0.12),
             curve: Curves.easeOutCubic,
           ),
         ),
@@ -71,51 +70,82 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _animController.dispose();
-    usernameController.dispose();
+    nameController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
-  bool _validateFields() {
-    if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter both email and password'),
-          backgroundColor: AppColors.errorRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      return false;
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
     }
-    return true;
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Invalid email';
+    }
+    return null;
   }
 
-  void _login() async {
-    if (!_validateFields()) return;
-    
+  void _register() async {
+    if (nameController.text.isEmpty || 
+        emailController.text.isEmpty || 
+        passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all fields'),
+          backgroundColor: AppColors.errorRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_validateEmail(emailController.text) != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email'),
+          backgroundColor: AppColors.errorRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
+    
     final appState = context.read<AppState>();
-    bool success = await appState.login(
-      usernameController.text,
-      passwordController.text,
-    );
+    
+    final userData = {
+      'username': nameController.text.split(' ').join().toLowerCase() + 
+                 DateTime.now().millisecondsSinceEpoch.toString().substring(10),
+      'password': passwordController.text,
+      'email': emailController.text,
+      'first_name': nameController.text.split(' ').first,
+      'last_name': nameController.text.split(' ').length > 1 
+                   ? nameController.text.split(' ').skip(1).join(' ') 
+                   : '',
+    };
+
+    final success = await appState.register(userData);
+    
     if (mounted) {
       setState(() => _isLoading = false);
-
       if (success) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Please login.'),
+            backgroundColor: AppColors.successGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/login');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Login failed. Please check credentials.'),
+          const SnackBar(
+            content: Text('Registration failed. Username or email already exists.'),
             backgroundColor: AppColors.errorRed,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
           ),
         );
       }
@@ -134,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: Stack(
               children: [
                 Container(
-                  height: MediaQuery.of(context).size.height * 0.45,
+                  height: MediaQuery.of(context).size.height * 0.4,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: AssetImage('assets/images/tropical_leaves.png'),
@@ -143,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
                 Container(
-                  height: MediaQuery.of(context).size.height * 0.45,
+                  height: MediaQuery.of(context).size.height * 0.4,
                   color: Colors.black.withValues(alpha: 0.1),
                 ),
               ],
@@ -158,18 +188,18 @@ class _LoginScreenState extends State<LoginScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
                   children: [
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.38),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.35),
                     
-                    // Welcome Header
-                    Row(
+                    // Header
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome Back',
+                              'Join Us',
                               style: TextStyle(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
@@ -178,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ),
                             Text(
-                              'Login to your account',
+                              'Create your new account',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFF9E9E9E),
@@ -187,98 +217,51 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Icon(
-                            Icons.eco_rounded,
-                            color: Colors.green.shade700,
+                            Icons.person_add_rounded,
+                            color: Color(0xFF2E7D32),
                             size: 32,
                           ),
                         ),
                       ],
                     ),
                     
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 40),
                     
                     // Form Fields
-                    _buildAnimatedWidget(
-                      1,
-                      _buildInputField(
-                        controller: usernameController,
-                        hint: 'Email Address',
-                        icon: Icons.person_outline_rounded,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildAnimatedWidget(
-                      2,
-                      _buildInputField(
-                        controller: passwordController,
-                        hint: 'Password',
-                        icon: Icons.lock_outline_rounded,
-                        isPassword: true,
-                      ),
-                    ),
+                    _buildAnimatedWidget(1, _buildInputField(
+                      controller: nameController,
+                      hint: 'Full Name',
+                      icon: Icons.person_outline_rounded,
+                    )),
+                    const SizedBox(height: 16),
+                    _buildAnimatedWidget(2, _buildInputField(
+                      controller: emailController,
+                      hint: 'Email Address',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                    )),
+                    const SizedBox(height: 16),
+                    _buildAnimatedWidget(3, _buildInputField(
+                      controller: passwordController,
+                      hint: 'Password',
+                      icon: Icons.lock_outline_rounded,
+                      isPassword: true,
+                    )),
                     
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 40),
                     
-                    // Remember Me & Forgot Password
+                    // Register Button
                     _buildAnimatedWidget(
-                      3,
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: Checkbox(
-                                  value: _rememberMe,
-                                  onChanged: (val) => setState(() => _rememberMe = val!),
-                                  activeColor: const Color(0xFF2E7D32),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Remember Me',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF9E9E9E),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
-                            child: const Text(
-                              'Forgot Password ?',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF2E7D32),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 50),
-                    
-                    // Login Button
-                    _buildAnimatedWidget(
-                      4,
+                      5,
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
+                          onPressed: _isLoading ? null : _register,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF388E3C),
                             foregroundColor: Colors.white,
@@ -290,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                           child: _isLoading 
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
-                                'Login',
+                                'Create Account',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -302,23 +285,23 @@ class _LoginScreenState extends State<LoginScreen>
                     
                     const SizedBox(height: 30),
                     
-                    // Sign Up Link
+                    // Already have an account
                     _buildAnimatedWidget(
-                      4,
+                      6,
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text(
-                            "Don't have account? ",
+                            "Already have an account? ",
                             style: TextStyle(
                               color: Color(0xFF9E9E9E),
                               fontSize: 14,
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pushNamed(context, '/register'),
+                            onTap: () => Navigator.pop(context),
                             child: const Text(
-                              'Sign up',
+                              'Sign in',
                               style: TextStyle(
                                 color: Color(0xFF2E7D32),
                                 fontWeight: FontWeight.bold,
@@ -329,6 +312,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                     ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -372,6 +356,7 @@ class _LoginScreenState extends State<LoginScreen>
     required String hint,
     required IconData icon,
     bool isPassword = false,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -385,6 +370,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: TextField(
         controller: controller,
         obscureText: isPassword,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Color(0xFF757575), fontSize: 15),

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import '../utils/app_animations.dart';
+import '../widgets/gradient_button.dart';
 
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({Key? key}) : super(key: key);
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProviderStateMixin {
+class _WelcomeScreenState extends State<WelcomeScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -16,21 +19,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1800),
+      duration: AppAnimations.slow,
       vsync: this,
     );
 
-    _fadeAnimation = CurvedAnimation(
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
-    );
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    ));
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
+      begin: AppAnimations.slideFromBottom,
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.2, 0.8, curve: Curves.easeOutBack),
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
     ));
 
     _controller.forward();
@@ -44,316 +50,131 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 12),
-
-                  /// Language selector
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.language, size: 18),
-                      label: const Text('English'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// Logo
-                  _AnimatedItem(
-                    delay: 0.1,
-                    controller: _controller,
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        boxShadow: [
-                          BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.eco_rounded,
-                        size: 52,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// Title
-                  _AnimatedItem(
-                    delay: 0.3,
-                    controller: _controller,
-                    child: Text(
-                      'Crop Monitoring',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  /// Subtitle
-                  _AnimatedItem(
-                    delay: 0.4,
-                    controller: _controller,
-                    child: Text(
-                      'Accurate field observations to power smarter estate decisions.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// Hero Image Card (Restored)
-                  _AnimatedItem(
-                    delay: 0.5,
-                    controller: _controller,
-                    child: Container(
-                      height: 220,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.asset(
-                              'assets/images/welcome_hero.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (c, e, s) => Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [theme.colorScheme.primary, theme.colorScheme.primaryContainer],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.8),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Align(
-                                alignment: Alignment.bottomLeft,
-                                child: Text(
-                                  'Agri-Tech\nDone Right.',
-                                  style: theme.textTheme.headlineMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.1,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// Features
-                  _AnimatedItem(
-                    delay: 0.6,
-                    controller: _controller,
-                    child: _FeatureTile(
-                      index: 0,
-                      icon: Icons.offline_pin_rounded,
-                      title: 'Works offline',
-                      subtitle: 'Capture observations anywhere',
-                    ),
-                  ),
-                  _AnimatedItem(
-                    delay: 0.7,
-                    controller: _controller,
-                    child: _FeatureTile(
-                      index: 1,
-                      icon: Icons.my_location_rounded,
-                      title: 'GPS auto-capture',
-                      subtitle: 'Accurate field locations',
-                    ),
-                  ),
-                  _AnimatedItem(
-                    delay: 0.8,
-                    controller: _controller,
-                    child: _FeatureTile(
-                      index: 2,
-                      icon: Icons.camera_alt_rounded,
-                      title: 'Photo evidence',
-                      subtitle: 'Attach field images',
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// CTA
-                  _AnimatedItem(
-                    delay: 1.0,
-                    controller: _controller,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 60),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        elevation: 4,
-                      ),
-                      child: const Text(
-                        'Get Started',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Text(
-                    'Precision Ag Management → Better Yields',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
+      body: Stack(
+        children: [
+          // Tropical leaf background
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/tropical_leaves.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          // Enhanced gradient overlay
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.4),
+                  Colors.black.withValues(alpha: 0.6),
+                  const Color(0xFF2E7D32).withValues(alpha: 0.3),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AnimatedItem extends StatelessWidget {
-  final Widget child;
-  final double delay;
-  final AnimationController controller;
-
-  const _AnimatedItem({
-    required this.child,
-    required this.delay,
-    required this.controller,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: controller,
-        curve: Interval(delay, (delay + 0.3).clamp(0.0, 1.0), curve: Curves.easeIn),
-      ),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.2),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: controller,
-          curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOutBack),
-        )),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _FeatureTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final int index;
-
-  const _FeatureTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.index,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-          ),
-          title: Text(
-            title,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
+          // Content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Spacer(flex: 2),
+                  // Animated title
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: const Text(
+                      'The best\napp for\nyour plants',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        height: 1.1,
+                        letterSpacing: -0.5,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            blurRadius: 20,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(flex: 3),
+                  // Animated buttons
+                  SlideTransition(
+                    position: _slideAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Column(
+                        children: [
+                          // Modern gradient Sign In button
+                          GradientButton(
+                            text: 'Sign In',
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/login');
+                            },
+                            icon: Icons.login_rounded,
+                          ),
+                          const SizedBox(height: 20),
+                          // Create Account Button with glass effect
+                          Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                width: 2,
+                              ),
+                              color: Colors.white.withValues(alpha: 0.1),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  Navigator.pushNamed(context, '/register');
+                                },
+                                child: const Center(
+                                  child: Text(
+                                    'Create an account',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 50),
+                ],
+              ),
             ),
           ),
-          subtitle: Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }
 }
+

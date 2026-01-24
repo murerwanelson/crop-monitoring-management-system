@@ -1,31 +1,58 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  final String serverUrl = 'http://10.72.49.103:8000'; // Django server root
-  final String apiUrl = 'http://10.72.49.103:8000/api'; // Django API root
+  // Use localhost for Web, 10.0.2.2 for Android Emulator, or your local machine IP
+  // Local machine IP: 10.72.189.171
+  static String get _host => kIsWeb ? 'localhost' : '10.72.189.171';
+  final String serverUrl = 'http://$_host:8000';
+  final String apiUrl = 'http://$_host:8000/api';
   final storage = FlutterSecureStorage();
 
-  // Register a new user
+  // Register a new user and store JWT tokens
   Future<bool> register(Map<String, dynamic> userData) async {
+    print('ApiService: Registering user to $apiUrl/register/');
     final response = await http.post(
       Uri.parse('$apiUrl/register/'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(userData),
-    );
+      body: jsonEncode({
+        'username': userData['username'],
+        'password': userData['password'],
+        'email': userData['email'],
+        'first_name': userData['first_name'] ?? '',
+        'last_name': userData['last_name'] ?? '',
+      }),
+    ).catchError((error) {
+      print('ApiService: Register error: $error');
+      throw error;
+    });
 
-    return response.statusCode == 201;
+    print('ApiService: Register response status: ${response.statusCode}');
+
+    if (response.statusCode == 201) {
+      // Logic for automatic login removed as per user request for manual login flow
+      return true;
+    }
+    
+    return false;
   }
 
   // Login and store JWT tokens
   Future<bool> login(String username, String password) async {
+    print('ApiService: Logging in to $serverUrl/api/token/');
     final response = await http.post(
       Uri.parse('$serverUrl/api/token/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
-    );
+    ).catchError((error) {
+      print('ApiService: Login error: $error');
+      throw error;
+    });
+
+    print('ApiService: Login response status: ${response.statusCode}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -37,6 +64,9 @@ class ApiService {
         final profile = await getUserProfile();
         await storage.write(key: 'role', value: profile['role']);
         await storage.write(key: 'username', value: profile['username']);
+        if (profile['permissions'] != null) {
+          await storage.write(key: 'permissions', value: jsonEncode(profile['permissions']));
+        }
       } catch (e) {
         print('Failed to fetch user profile during login: $e');
       }
@@ -101,17 +131,22 @@ class ApiService {
   Future<http.Response> authenticatedRequest(
       String method, String path, {Map<String, dynamic>? body, bool isServerPath = false}) async {
     final String url = isServerPath ? '$serverUrl$path' : '$apiUrl$path';
-    
+    print('ApiService: $method $url');
     // First attempt
     var headers = await getHeaders();
     http.Response response;
     
-    if (method == 'GET') {
-      response = await http.get(Uri.parse(url), headers: headers);
-    } else if (method == 'POST') {
-      response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
-    } else {
-      throw Exception('Unsupported HTTP method');
+    try {
+      if (method == 'GET') {
+        response = await http.get(Uri.parse(url), headers: headers);
+      } else if (method == 'POST') {
+        response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
+      } else {
+        throw Exception('Unsupported HTTP method');
+      }
+    } catch (e) {
+      print('ApiService: Connection error during $method $url: $e');
+      rethrow;
     }
 
     // If unauthorized, try to refresh token and retry ONCE
@@ -152,7 +187,7 @@ class ApiService {
     final response = await authenticatedRequest('POST', '/fields/', body: data);
 
     if (response.statusCode != 201) {
-      throw Exception('Failed to create field: ${response.body}');
+      throw Exception('HTTP ${response.statusCode}: Failed to create field: ${response.body}');
     }
   }
 
@@ -164,7 +199,7 @@ class ApiService {
       final responseData = jsonDecode(response.body);
       return responseData['id'];
     } else {
-      throw Exception('Failed to create observation: ${response.body}');
+      throw Exception('HTTP ${response.statusCode}: Failed to create observation: ${response.body}');
     }
   }
 
@@ -218,6 +253,48 @@ class ApiService {
       throw Exception('Failed to upload media');
     }
   }
+
+  // --- Analytics & Statistics ---
+
+  Future<Map<String, dynamic>> getAnalyticsDashboard({int days = 30}) async {
+    final response = await authenticatedRequest('GET', '/stats/dashboard/?days=$days');
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load analytics dashboard');
+    }
+  }
+
+  Future<List<dynamic>> getMoistureTrends({int days = 30}) async {
+    final response = await authenticatedRequest('GET', '/stats/moisture_trends/?days=$days');
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load moisture trends');
+    }
+  }
+
+  Future<Map<String, dynamic>> getGrowthAnalysis({String? cropVariety}) async {
+    String path = '/stats/growth_analysis/';
+    if (cropVariety != null) path += '?crop_variety=$cropVariety';
+    
+    final response = await authenticatedRequest('GET', path);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load growth analysis');
+    }
+  }
+
+  // GET fields GeoJSON map data
+  Future<Map<String, dynamic>> getFieldsMapData() async {
+    final response = await authenticatedRequest('GET', '/fields/map_data/');
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load field map data');
+    }
+  }
   
   // Get weather from Open-Meteo
   Future<String> getWeather(double lat, double lon) async {
@@ -249,5 +326,42 @@ class ApiService {
     if (code >= 85 && code <= 86) return 'Snow showers';
     if (code >= 95) return 'Thunderstorm';
     return 'Unknown';
+  }
+
+  // Request password reset token
+  Future<bool> requestPasswordReset(String email) async {
+    print('ApiService: Requesting password reset for $email');
+    try {
+      final response = await http.post(
+        Uri.parse('$apiUrl/password-reset/request/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      );
+      print('ApiService: Request reset status: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('ApiService: Request reset error: $e');
+      return false;
+    }
+  }
+
+  // Reset password using token
+  Future<bool> resetPassword(String token, String newPassword) async {
+    print('ApiService: Resetting password with token');
+    try {
+      final response = await http.post(
+        Uri.parse('$apiUrl/password-reset/confirm/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': token,
+          'new_password': newPassword,
+        }),
+      );
+      print('ApiService: Reset password status: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('ApiService: Reset password error: $e');
+      return false;
+    }
   }
 }

@@ -14,11 +14,12 @@ import {
     MenuItem,
     TextField
 } from '@mui/material';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getFieldMapData } from '../services/api';
 import { useLocation } from 'react-router-dom';
+import axios from 'axios'; // Import axios for API calls
 
 // Fix for default marker icons in React-Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -28,11 +29,17 @@ L.Icon.Default.mergeOptions({
     shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-const ChangeView = ({ center, zoom }) => {
+const WEATHER_API_KEY = 'your_openweathermap_api_key'; // Replace with your API key
+
+const ChangeView = ({ center, zoom, bounds }) => {
     const map = useMap();
     useEffect(() => {
-        map.setView(center, zoom);
-    }, [center, zoom, map]);
+        if (bounds) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else if (center && zoom) {
+            map.setView(center, zoom);
+        }
+    }, [center, zoom, bounds, map]);
     return null;
 };
 
@@ -47,6 +54,9 @@ const MapView = () => {
     const [cropVariety, setCropVariety] = useState('All');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [bounds, setBounds] = useState(null); // State to store bounds
+    const [weatherData, setWeatherData] = useState(null);
+    const [notifications, setNotifications] = useState([]);
 
     useEffect(() => {
         // Fly to user location if available
@@ -59,7 +69,7 @@ const MapView = () => {
                 console.log('Error getting location for map:', error);
             });
         }
-    }, []);
+    }, [location.state?.center]); // Added missing dependency
 
     useEffect(() => {
         loadMapData();
@@ -68,7 +78,13 @@ const MapView = () => {
     const loadMapData = async () => {
         try {
             const data = await getFieldMapData();
-            setMapData(data);
+
+            // Filter GeoJSON layers based on user-assigned fields
+            const userAssignedFields = data.features.filter((feature) => {
+                return feature.properties.isAssigned; // Assuming `isAssigned` is a backend-provided flag
+            });
+
+            setMapData({ ...data, features: userAssignedFields });
         } catch (error) {
             console.error('Error loading map data:', error);
         } finally {
@@ -77,17 +93,80 @@ const MapView = () => {
     };
 
     useEffect(() => {
-        const loadMetrics = async () => {
-            if (mapData?.features?.length > 0 && !location.state?.center && mapCenter[0] === -1.2921) {
-                // If we loaded data and haven't set a specific center (geo or nav), center on first feature
-                // But if Geolocation is working, it might race. 
-                // Let's rely on Geolocation primarily if available for the "Both systems should pick my location" request.
-                // We will leave this solely for fallback if geo fails or data demands it.
-                // Actually, let's just let the Geolocation effect handle the "current location" requirement.
+        if (mapData?.features?.length > 0) {
+            try {
+                const geoJsonLayer = L.geoJSON(mapData);
+                const calculatedBounds = geoJsonLayer.getBounds();
+                if (calculatedBounds.isValid()) {
+                    setBounds(calculatedBounds); // Update bounds state
+                }
+            } catch (e) {
+                console.error('Error calculating bounds:', e);
             }
-        };
-        loadMetrics();
+        }
     }, [mapData]);
+
+    useEffect(() => {
+        if (mapCenter) {
+            const [lat, lon] = mapCenter;
+            fetchWeatherData(lat, lon).then((data) => setWeatherData(data));
+        }
+    }, [mapCenter]);
+
+    const fetchWeatherData = async (lat, lon) => {
+        try {
+            const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather`, {
+                params: {
+                    lat,
+                    lon,
+                    appid: WEATHER_API_KEY,
+                    units: 'metric',
+                },
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching weather data:', error);
+            return null;
+        }
+    };
+
+    const fetchNotifications = async (fieldIds) => {
+        try {
+            const response = await axios.post('/api/notifications', { fieldIds });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+            return [];
+        }
+    };
+
+    useEffect(() => {
+        if (mapData?.features) {
+            const fieldIds = mapData.features.map((feature) => feature.properties.field_id);
+            fetchNotifications(fieldIds).then((data) => setNotifications(data));
+        }
+    }, [mapData]);
+
+    const renderGeoJSON = () => {
+        if (!mapData) return null;
+
+        return (
+            <LayersControl.Overlay name="Field Boundaries" checked>
+                <GeoJSON
+                    data={mapData}
+                    style={{ color: 'blue', weight: 2 }}
+                    onEachFeature={(feature, layer) => {
+                        layer.bindPopup(
+                            `<strong>Field ID:</strong> ${feature.properties.field_id}<br />
+                             <strong>Variety:</strong> ${feature.properties.crop_variety || 'N/A'}<br />
+                             <strong>Collector:</strong> ${feature.properties.created_by_name}<br />
+                             <strong>Observations:</strong> ${feature.properties.observation_count}`
+                        );
+                    }}
+                />
+            </LayersControl.Overlay>
+        );
+    };
 
     if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
 
@@ -105,24 +184,6 @@ const MapView = () => {
 
         return matchesVariety && matchesDate;
     }) || [];
-
-    // Default center if no fields
-    let center = [-1.286389, 36.817223]; // Nairobi default
-
-    if (filteredFeatures.length > 0) {
-        const firstFeature = filteredFeatures[0];
-        const geometry = firstFeature.geometry || firstFeature.properties?.location;
-
-        if (geometry && geometry.coordinates) {
-            if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates[0]) && Array.isArray(geometry.coordinates[0][0])) {
-                // Use the first point of the first ring: [lng, lat]
-                const firstPoint = geometry.coordinates[0][0];
-                center = [firstPoint[1], firstPoint[0]]; // Leaflet uses [lat, lng]
-            } else if (geometry.type === 'Point' && Array.isArray(geometry.coordinates)) {
-                center = [geometry.coordinates[1], geometry.coordinates[0]];
-            }
-        }
-    }
 
     const FieldPopup = ({ feature }) => (
         <Card variant="outlined" sx={{ minWidth: 220, border: 'none' }}>
@@ -151,6 +212,34 @@ const MapView = () => {
     return (
         <Container maxWidth="lg">
             <Typography variant="h4" gutterBottom>Interactive Field Map</Typography>
+
+            {/* Notifications Section */}
+            {notifications.length > 0 && (
+                <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h6">Alerts and Notifications</Typography>
+                    <ul>
+                        {notifications.map((notification, index) => (
+                            <li key={index}>{notification.message}</li>
+                        ))}
+                    </ul>
+                </Paper>
+            )}
+
+            {/* Weather Section */}
+            {weatherData && (
+                <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h6">Weather Updates</Typography>
+                    <Typography variant="body1">
+                        <strong>Temperature:</strong> {weatherData.main.temp}°C
+                    </Typography>
+                    <Typography variant="body1">
+                        <strong>Condition:</strong> {weatherData.weather[0].description}
+                    </Typography>
+                    <Typography variant="body1">
+                        <strong>Humidity:</strong> {weatherData.main.humidity}%
+                    </Typography>
+                </Paper>
+            )}
 
             {/* Filters Section */}
             <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
@@ -194,7 +283,7 @@ const MapView = () => {
 
             <Paper elevation={3} sx={{ height: '70vh', width: '100%', mb: 4, borderRadius: 2, overflow: 'hidden' }}>
                 <MapContainer center={mapCenter} zoom={zoom} style={{ height: '100%', width: '100%' }}>
-                    <ChangeView center={mapCenter} zoom={zoom} />
+                    <ChangeView center={mapCenter} zoom={zoom} bounds={bounds} />
                     <LayersControl position="topright">
                         <LayersControl.BaseLayer checked name="Satellite (Esri)">
                             <TileLayer
@@ -241,6 +330,8 @@ const MapView = () => {
                             </React.Fragment>
                         );
                     })}
+
+                    {renderGeoJSON()}
                 </MapContainer>
             </Paper>
         </Container>

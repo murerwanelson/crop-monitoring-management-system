@@ -14,11 +14,13 @@ from rest_framework_gis.fields import GeometryField
 
 
 class UserSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(source='userprofile.role')
+    role = serializers.CharField(source='userprofile.role', read_only=True)
+    permissions = serializers.ListField(source='userprofile.permissions', read_only=True)
+    assigned_fields = serializers.PrimaryKeyRelatedField(many=True, read_only=True, source='userprofile.assigned_fields')
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'permissions', 'assigned_fields']
 
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('userprofile', {})
@@ -39,15 +41,39 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
-    role = serializers.ChoiceField(choices=UserProfile.ROLE_CHOICES, required=False)
+    """
+    Secure registration serializer for field collectors.
+    The role is hardcoded server-side to prevent parameter pollution.
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    email = serializers.EmailField(required=True)
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'email', 'first_name', 'last_name', 'role']
+        fields = ['username', 'password', 'email', 'first_name', 'last_name']
+        # NOTE: 'role' is explicitly NOT included to prevent client-side manipulation
+
+    def validate_email(self, value):
+        """Ensure email uniqueness"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_username(self, value):
+        """Ensure username uniqueness"""
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
 
     def create(self, validated_data):
-        role = validated_data.pop('role', 'FIELD_COLLECTOR')
+        """
+        Create user with automatic field_collector role assignment.
+        Security: Role cannot be overridden from client request.
+        """
+        # SECURITY: Remove any 'role' from validated_data to prevent parameter pollution
+        validated_data.pop('role', None)
+        
+        # Create the user
         user = User.objects.create_user(
             username=validated_data['username'],
             password=validated_data['password'],
@@ -55,7 +81,22 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
         )
-        UserProfile.objects.create(user=user, role=role)
+        
+        # SECURITY: Hardcode role assignment server-side
+        # This ensures all new users get field_collector role regardless of request data
+        role = 'FIELD_COLLECTOR'
+        
+        # Default permissions for field collectors
+        default_permissions = ["write_logs", "upload_gps", "access_camera"]
+        
+        # Create user profile with forced role and permissions
+        UserProfile.objects.create(
+            user=user,
+            role=role,
+            permissions=default_permissions,
+            is_active=True
+        )
+        
         return user
 
 
@@ -86,15 +127,26 @@ class FieldSerializer(serializers.ModelSerializer):
 class FieldGeoSerializer(GeoFeatureModelSerializer):
     """GeoJSON serializer for map visualization"""
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    observation_count = serializers.SerializerMethodField()
-    
-    def get_observation_count(self, obj):
-        return obj.observation_set.count()
-    
+    last_observation_date = serializers.SerializerMethodField()
+
+    def get_last_observation_date(self, obj):
+        last_obs = obj.observation_set.order_by('-observation_date').first()
+        if last_obs:
+            return last_obs.observation_date
+        return None
+
     class Meta:
         model = Field
-        geo_field = 'boundary'  # Use polygon boundary for map data if available
-        fields = ['id', 'field_id', 'location', 'created_by_name', 'observation_count', 'created_at']
+        geo_field = 'boundary'
+        fields = ['id', 'field_id', 'location', 'boundary', 'created_by_name', 'last_observation_date']
+
+    def to_representation(self, instance):
+        # Ensure NoneType attributes are handled gracefully
+        representation = super().to_representation(instance)
+        properties = representation.get('properties', {})
+        properties = {key: value for key, value in properties.items() if value is not None}
+        representation['properties'] = properties
+        return representation
 
 
 class MediaSerializer(serializers.ModelSerializer):
@@ -230,3 +282,26 @@ class AuditLogSerializer(serializers.ModelSerializer):
         model = AuditLog
         fields = ['id', 'user', 'username', 'action', 'resource_type', 'resource_id', 'timestamp', 'details']
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            # Security: Don't raise error if email doesn't exist to prevent enumeration
+            pass
+        return value
+
+
+class PasswordResetUpdateSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+    def validate_token(self, value):
+        from .models import PasswordResetToken
+        try:
+            token_obj = PasswordResetToken.objects.get(token=value, is_used=False)
+            if token_obj.is_expired():
+                raise serializers.ValidationError("Token has expired.")
+            return value
+        except PasswordResetToken.DoesNotExist:
+            raise serializers.ValidationError("Invalid token.")

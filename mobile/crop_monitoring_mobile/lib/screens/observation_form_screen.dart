@@ -10,8 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:geoxml/geoxml.dart' as gxml;
+import 'package:latlong2/latlong.dart';
 
 import '../providers/app_state.dart';
 import '../services/api_service.dart';
@@ -247,75 +246,6 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     });
   }
 
-  /* ================= FILE IMPORT ================= */
-
-  Future<void> _pickBoundaryFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['geojson', 'json', 'kml'],
-        withData: true,
-      );
-      if (result == null) return;
-
-      final file = result.files.single;
-      final ext = file.extension?.toLowerCase();
-      List<List<LatLng>> polygons = [];
-
-      if (ext == 'geojson' || ext == 'json') {
-        final data = jsonDecode(utf8.decode(file.bytes!));
-        if (data['type'] == 'FeatureCollection') {
-          for (var f in data['features']) {
-            polygons.add(_parsePolygon(f['geometry']));
-          }
-        }
-      }
-
-      if (polygons.isEmpty) {
-        _snack('No valid polygons found.');
-        return;
-      }
-
-      _selectImportedPolygon(polygons);
-    } catch (_) {
-      _snack('Import failed.');
-    }
-  }
-
-  List<LatLng> _parsePolygon(Map<String, dynamic> geom) {
-    if (geom['type'] != 'Polygon') return [];
-    return geom['coordinates'][0]
-        .map<LatLng>((c) => LatLng(c[1], c[0]))
-        .toList();
-  }
-
-  Future<void> _selectImportedPolygon(List<List<LatLng>> polys) async {
-    final selected = await showDialog<int>(
-      context: context,
-      builder: (_) => SimpleDialog(
-        title: const Text('Select boundary'),
-        children: [
-          for (int i = 0; i < polys.length; i++)
-            SimpleDialogOption(
-              child: Text('Polygon ${i + 1}'),
-              onPressed: () => Navigator.pop(context, i),
-            ),
-        ],
-      ),
-    );
-
-    if (selected == null) return;
-
-    setState(() {
-      _points
-        ..clear()
-        ..addAll(polys[selected]);
-      _redoStack.clear();
-      _updatePolygon();
-      _mapController.move(_points.first, 16);
-      _saveDraft();
-    });
-  }
 
   /* ================= AREA ================= */
 
@@ -369,6 +299,12 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_validatePolygon()) return;
 
+    // Validate Field ID if not provided via navigation
+    if (widget.fieldId == null && _fieldNameCtrl.text.trim().isEmpty) {
+      _snack('Please provide a Field Name or ID');
+      return;
+    }
+
     // Strict validation for Crop Management
     if (_sprayed && _pesticideCtrl.text.trim().isEmpty) {
       _snack('Please enter the Type of Pesticide used');
@@ -402,9 +338,9 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       // Build crop_management nested object
       final cropManagement = {
         'sprayed': _sprayed,
-        'pesticide_used': _sprayed ? _pesticideCtrl.text : null,
+        'pesticide_used': _sprayed ? _pesticideCtrl.text : "",
         'fertilizer_applied': _fertilized,
-        'fertilizer_type': _fertilized ? _fertilizerCtrl.text : null,
+        'fertilizer_type': _fertilized ? _fertilizerCtrl.text : "",
         'fertilizer_date': _fertilized ? _fertDate?.toIso8601String().split('T')[0] : null,
         'weather': _weatherCtrl.text,
         'watering': _wateringCtrl.text,
@@ -587,7 +523,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
               title: 'Field Details',
               children: [
                 if (widget.fieldId == null) ...[
-                   _field('Field Name / ID', _fieldNameCtrl, icon: Icons.map),
+                   _field('Field Name / ID *', _fieldNameCtrl, icon: Icons.map),
                    const SizedBox(height: 12),
                 ],
                 _field('Collector *', _collectorCtrl, icon: Icons.person),
@@ -795,14 +731,9 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.file_upload),
-                    onPressed: _pickBoundaryFile,
-                    tooltip: 'Upload Shapefile',
-                  ),
-                  IconButton(
                     icon: const Icon(Icons.undo),
                     onPressed: _points.isEmpty ? null : _undo,
-                    tooltip: 'Undo',
+                    tooltip: 'Undo Last Point',
                   ),
                   IconButton(
                     icon: const Icon(Icons.redo),

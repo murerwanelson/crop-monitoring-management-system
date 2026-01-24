@@ -135,6 +135,12 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Add the custom authentication backend
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Default backend
+    'crops.auth_backends.EmailOrSurnameBackend',  # Custom backend
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -166,3 +172,6 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email Configuration (Console for development)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

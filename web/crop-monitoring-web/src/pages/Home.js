@@ -34,8 +34,10 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { getDashboardStats, getWeatherData } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const Home = () => {
+    const { user } = useAuth();
     const [stats, setStats] = useState(null);
     const [weather, setWeather] = useState({ temp: 28, city: 'Kakira', subtext: 'Uganda, East Africa', desc: 'Sunny', hum: 45 });
     const [anchorElNotifications, setAnchorElNotifications] = useState(null);
@@ -384,15 +386,17 @@ const Home = () => {
                         </MenuItem>
                     </Menu>
 
-                    <Button
-                        component={Link}
-                        to="/dashboard"
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        sx={{ borderRadius: 3, fontWeight: 700, px: 3 }}
-                    >
-                        New Entry
-                    </Button>
+                    {user?.role !== 'VIEWER' && (
+                        <Button
+                            component={Link}
+                            to="/dashboard"
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            sx={{ borderRadius: 3, fontWeight: 700, px: 3 }}
+                        >
+                            New Entry
+                        </Button>
+                    )}
                 </Stack>
             </Stack>
 
@@ -496,15 +500,17 @@ const Home = () => {
                     Quick Access
                 </Typography>
                 <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                        <ActionCard
-                            title="New Observation"
-                            desc="Log field data now"
-                            icon={<AddIcon />}
-                            to="/dashboard"
-                            color={theme.palette.primary.main}
-                        />
-                    </Grid>
+                    {user?.role !== 'VIEWER' && (
+                        <Grid item xs={12} md={4}>
+                            <ActionCard
+                                title="New Observation"
+                                desc="Log field data now"
+                                icon={<AddIcon />}
+                                to="/dashboard"
+                                color={theme.palette.primary.main}
+                            />
+                        </Grid>
+                    )}
                     <Grid item xs={12} md={4}>
                         <ActionCard
                             title="Field Intelligence"
