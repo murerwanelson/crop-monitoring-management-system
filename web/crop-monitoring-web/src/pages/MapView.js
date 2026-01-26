@@ -12,9 +12,16 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    TextField
+    TextField,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Tooltip
 } from '@mui/material';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, GeoJSON, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getFieldMapData } from '../services/api';
@@ -147,26 +154,6 @@ const MapView = () => {
         }
     }, [mapData]);
 
-    const renderGeoJSON = () => {
-        if (!mapData) return null;
-
-        return (
-            <LayersControl.Overlay name="Field Boundaries" checked>
-                <GeoJSON
-                    data={mapData}
-                    style={{ color: 'blue', weight: 2 }}
-                    onEachFeature={(feature, layer) => {
-                        layer.bindPopup(
-                            `<strong>Field ID:</strong> ${feature.properties.field_id}<br />
-                             <strong>Variety:</strong> ${feature.properties.crop_variety || 'N/A'}<br />
-                             <strong>Collector:</strong> ${feature.properties.created_by_name}<br />
-                             <strong>Observations:</strong> ${feature.properties.observation_count}`
-                        );
-                    }}
-                />
-            </LayersControl.Overlay>
-        );
-    };
 
     if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
 
@@ -185,29 +172,88 @@ const MapView = () => {
         return matchesVariety && matchesDate;
     }) || [];
 
-    const FieldPopup = ({ feature }) => (
-        <Card variant="outlined" sx={{ minWidth: 220, border: 'none' }}>
-            <CardContent sx={{ p: 1 }}>
-                <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 700 }}>
-                    {feature.properties.field_id}
-                </Typography>
-                <Box sx={{ mt: 1 }}>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <strong>Variety:</strong> {feature.properties.crop_variety || 'N/A'}
+    const FieldPopup = ({ feature }) => {
+        const [indices, setIndices] = useState(null);
+        const [loadingIndices, setLoadingIndices] = useState(true);
+
+        useEffect(() => {
+            const fetchIndices = async () => {
+                try {
+                    const token = localStorage.getItem('accessToken');
+                    const response = await axios.get(`http://127.0.0.1:8000/api/fields/${feature.id}/indices/`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setIndices(response.data);
+                } catch (error) {
+                    console.error('Error fetching indices:', error);
+                } finally {
+                    setLoadingIndices(false);
+                }
+            };
+            fetchIndices();
+        }, [feature.id]);
+
+        return (
+            <Card variant="outlined" sx={{ minWidth: 280, border: 'none', boxShadow: 'none' }}>
+                <CardContent sx={{ p: 0 }}>
+                    <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 800, mb: 1 }}>
+                        {feature.properties.field_id}
                     </Typography>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <strong>Collector:</strong> {feature.properties.created_by_name}
+
+                    <Grid container spacing={1} sx={{ mb: 2 }}>
+                        <Grid item xs={12}>
+                            <Typography variant="body2"><strong>Variety:</strong> {feature.properties.crop_variety || 'N/A'}</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="body2"><strong>Collector:</strong> {feature.properties.created_by_name}</Typography>
+                        </Grid>
+                    </Grid>
+
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>Satellite Indices (Live)</Typography>
+
+                    {loadingIndices ? (
+                        <Box display="flex" justifyContent="center" p={2}><CircularProgress size={20} /></Box>
+                    ) : indices ? (
+                        <TableContainer component={Paper} elevation={0} sx={{ bgcolor: 'grey.50', borderRadius: 2 }}>
+                            <Table size="small" padding="none">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.7rem', p: 0.5 }}>Index</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.7rem', p: 0.5 }}>Value</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {Object.entries(indices).map(([key, value]) => (
+                                        <TableRow key={key}>
+                                            <TableCell sx={{ fontSize: '0.75rem', p: 0.5 }}>
+                                                <Tooltip title="Satellite Derived Index">
+                                                    <span style={{ cursor: 'help', borderBottom: '1px dotted #ccc' }}>{key}</span>
+                                                </Tooltip>
+                                            </TableCell>
+                                            <TableCell align="right" sx={{
+                                                fontSize: '0.75rem',
+                                                p: 0.5,
+                                                fontWeight: 'bold',
+                                                color: (key === 'NDVI' || key === 'EVI') ? (value > 0.6 ? 'green' : 'orange') : 'text.primary'
+                                            }}>
+                                                {value}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    ) : (
+                        <Typography variant="caption" color="text.secondary">Failed to load indices.</Typography>
+                    )}
+
+                    <Typography variant="caption" color="textSecondary" sx={{ mt: 2, display: 'block', fontStyle: 'italic' }}>
+                        Updated: {new Date().toLocaleDateString()}
                     </Typography>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <strong>Observations:</strong> {feature.properties.observation_count}
-                    </Typography>
-                </Box>
-                <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                    Added: {new Date(feature.properties.created_at).toLocaleDateString()}
-                </Typography>
-            </CardContent>
-        </Card>
-    );
+                </CardContent>
+            </Card>
+        );
+    };
 
     return (
         <Container maxWidth="lg">
@@ -284,20 +330,11 @@ const MapView = () => {
             <Paper elevation={3} sx={{ height: '70vh', width: '100%', mb: 4, borderRadius: 2, overflow: 'hidden' }}>
                 <MapContainer center={mapCenter} zoom={zoom} style={{ height: '100%', width: '100%' }}>
                     <ChangeView center={mapCenter} zoom={zoom} bounds={bounds} />
-                    <LayersControl position="topright">
-                        <LayersControl.BaseLayer checked name="Satellite (Esri)">
-                            <TileLayer
-                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
-                            />
-                        </LayersControl.BaseLayer>
-                        <LayersControl.BaseLayer name="Street Map (OSM)">
-                            <TileLayer
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            />
-                        </LayersControl.BaseLayer>
-                    </LayersControl>
+                    <TileLayer
+                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+                        maxZoom={19}
+                    />
 
                     {filteredFeatures.map((feature) => {
                         // Handle null geometry by falling back to location point in properties
@@ -314,7 +351,12 @@ const MapView = () => {
                                 {isPolygon ? (
                                     <Polygon
                                         positions={coords}
-                                        pathOptions={{ color: '#4caf50', weight: 3, fillOpacity: 0.2 }}
+                                        pathOptions={{
+                                            color: '#00C853',
+                                            weight: 4,
+                                            fillOpacity: 0.1,
+                                            fillColor: '#00C853'
+                                        }}
                                     >
                                         <Popup>
                                             <FieldPopup feature={feature} />
@@ -330,8 +372,6 @@ const MapView = () => {
                             </React.Fragment>
                         );
                     })}
-
-                    {renderGeoJSON()}
                 </MapContainer>
             </Paper>
         </Container>

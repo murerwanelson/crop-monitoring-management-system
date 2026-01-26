@@ -70,6 +70,14 @@ class LocalDB {
   // Insert observation
   Future<int> insertObservation(Map<String, dynamic> data) async {
     final dbClient = await db;
+    
+    // Ensure offline records have a unique identifier for idempotency
+    if (data['client_uuid'] == null) {
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String random = (100000 + (DateTime.now().microsecond % 900000)).toString();
+      data['client_uuid'] = 'offline-$timestamp-$random';
+    }
+    
     return await dbClient.insert('observations', {
       'data': jsonEncode(data),
       'synced': 0,

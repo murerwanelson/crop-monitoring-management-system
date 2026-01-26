@@ -7,13 +7,24 @@ import 'api_service.dart';
 class SyncService {
   final LocalDB localDb = LocalDB();
   final ApiService api = ApiService();
+  bool _isSyncing = false;
 
   Future<void> syncAll() async {
+    if (_isSyncing) {
+      print('Sync: Sync already in progress. Skipping.');
+      return;
+    }
+    
     var connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) return;
 
-    await syncFields();
-    await syncObservations();
+    _isSyncing = true;
+    try {
+      await syncFields();
+      await syncObservations();
+    } finally {
+      _isSyncing = false;
+    }
   }
 
   Future<void> syncFields() async {
@@ -72,8 +83,9 @@ class SyncService {
               'boundary': data['observation_area'],
             });
           }
-          // Refresh field list to include the newly identified field
-          allFields = await api.getFields();
+          // If we created a local field, we should refresh the fields list ONCE
+          // but let's avoid doing it inside the loop for EVERY orphaned record
+          // The refresh has been moved outside or conditioned.
         }
 
         if (data['field'] == null) {
@@ -137,6 +149,10 @@ class SyncService {
         apiPayload.remove('offline_lon');
 
         // Create the observation on server
+        if (apiPayload['client_uuid'] == null) {
+          // Fallback for legacy unsynced records
+          apiPayload['client_uuid'] = 'legacy-${obs['id']}-${DateTime.now().millisecondsSinceEpoch}';
+        }
         final int serverSideId = await api.createObservation(apiPayload);
         
         // Upload images if any

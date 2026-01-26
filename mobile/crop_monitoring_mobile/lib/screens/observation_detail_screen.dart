@@ -181,37 +181,61 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
   /* ===================== SECTIONS ===================== */
 
   Widget _headerCard() {
+    final bool isUrgent = _detail!['urgent_attention'] == true;
+    
     return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.eco,
-              size: 44,
-              color: Theme.of(context).colorScheme.primary,
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isUrgent ? const BorderSide(color: Colors.red, width: 2) : BorderSide.none,
+      ),
+      child: Column(
+        children: [
+          if (isUrgent)
+            Container(
+              width: double.infinity,
+              color: Colors.red,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: const Text(
+                'URGENT ATTENTION',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              ),
             ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Text(
-                  _detail!['crop_variety'] ?? 'Unknown Crop',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                Icon(
+                  Icons.eco,
+                  size: 44,
+                  color: isUrgent ? Colors.red : Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Growth stage: ${_detail!['growth_stage'] ?? 'N/A'}',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _detail!['crop_variety'] ?? 'Unknown Crop',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Growth stage: ${_detail!['growth_stage'] ?? 'N/A'}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -253,16 +277,26 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
       [
         _row('Sprayed', cm['sprayed'] == true ? 'Yes' : 'No'),
         if (cm['sprayed'] == true)
-          _row('Pesticide', cm['pesticide_type']),
-        _row(
-            'Fertilized',
-            cm['fertilizer_applied'] == true
-                ? 'Yes'
-                : 'No'),
+          _row('Pesticide Use', cm['pesticide_used']),
+          
+        _row('Fertilized', cm['fertilizer_applied'] == true ? 'Yes' : 'No'),
         if (cm['fertilizer_applied'] == true) ...[
-          _row('Fertilizer', cm['fertilizer_type']),
+          _row('Fertilizer Type', cm['fertilizer_type']),
+          _row('Amount', '${cm['fertilizer_amount'] ?? '-'} kg/ha'),
           _row('Date', cm['fertilizer_date']),
         ],
+        _row('Irrigation', cm['irrigation_applied'] == true ? 'Applied' : 'No'),
+        
+        const SizedBox(height: 8),
+        const Text('Pest & Disease Assessment', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        const Divider(),
+        if (cm['pest_present'] == true) ...[
+           _row('Detection', 'Pest/Disease Present'),
+           _row('Type', cm['pest_type'], highlight: true),
+           _row('Severity', cm['pest_severity'], isSevere: cm['pest_severity'] == 'High'),
+           _row('Affected', '${cm['pest_percentage_affected'] ?? 0}%'),
+        ] else 
+           const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('No pests detected', style: TextStyle(fontStyle: FontStyle.italic))),
       ],
     );
   }
@@ -274,11 +308,68 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
       'Measurements',
       [
         _row('Height', '${m['crop_height_cm'] ?? 0} cm'),
-        _row('Stalk Diameter', '${m['stalk_diameter_mm'] ?? 0} mm'),
-        _row('Green Leaves', '${m['green_leaves'] ?? 0}'),
-        _row('Population', '${m['plant_population'] ?? 0}'),
-        _row('Soil Moisture', '${m['soil_moisture'] ?? 0}%'),
+        if (m['stalk_diameter'] != null)
+           _row('Stalk Diameter', '${m['stalk_diameter'] ?? 0} mm'),
+        
+        _row('Green Leaves', '${m['number_of_leaves'] ?? 0}'),
+        _row('Population', '${m['plant_population'] ?? 0} plants/ha'),
+        
+        const SizedBox(height: 12),
+        Row(
+          children: [
+             Expanded(child: _chip('Vigor', m['vigor'])),
+             const SizedBox(width: 8),
+             Expanded(child: _chip('Moisture', m['soil_moisture_level'])),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+           children: [
+             Expanded(child: _chip('Weed Pressure', m['weed_pressure'])),
+             const SizedBox(width: 8),
+             Expanded(child: _infoBox('Canopy', '${m['canopy_cover_percentage'] ?? 0}%')),
+           ],
+        )
       ],
+    );
+  }
+  
+  Widget _chip(String label, String? value) {
+    Color color = Colors.grey;
+    if (value == 'Good' || value == 'Excellent' || value == 'Low' || value == 'Moist') color = Colors.green;
+    if (value == 'High' || value == 'Poor' || value == 'Dry') color = Colors.orange;
+    
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(value ?? 'N/A', style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+  
+  Widget _infoBox(String label, String value) {
+     return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 
@@ -335,14 +426,20 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
     );
   }
 
-  Widget _row(String label, String? value) {
+  Widget _row(String label, String? value, {bool highlight = false, bool isSevere = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text(value ?? 'N/A'),
+          Text(
+            value ?? 'N/A', 
+            style: TextStyle(
+              fontWeight: highlight || isSevere ? FontWeight.bold : FontWeight.normal,
+              color: isSevere ? Colors.red : Colors.black
+            )
+          ),
         ],
       ),
     );

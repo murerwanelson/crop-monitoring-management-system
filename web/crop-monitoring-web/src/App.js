@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ColorModeProvider, useColorMode } from './contexts/ThemeContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Home from './pages/Home';
@@ -13,8 +14,9 @@ import Users from './pages/Users';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
-const theme = createTheme({
+const getDesignTokens = (mode) => ({
   palette: {
+    mode,
     primary: {
       main: '#10B981', // Modern Emerald Green
       light: '#34D399',
@@ -26,14 +28,27 @@ const theme = createTheme({
       light: '#FBBF24',
       dark: '#D97706',
     },
-    background: {
-      default: '#F8FAFC', // Slate 50
-      paper: '#ffffff',
-    },
-    text: {
-      primary: '#1E293B', // Slate 800
-      secondary: '#64748B', // Slate 500
-    },
+    ...(mode === 'light'
+      ? {
+        background: {
+          default: '#F8FAFC', // Slate 50
+          paper: '#ffffff',
+        },
+        text: {
+          primary: '#1E293B', // Slate 800
+          secondary: '#64748B', // Slate 500
+        },
+      }
+      : {
+        background: {
+          default: '#0F172A', // Slate 900
+          paper: '#1E293B', // Slate 800
+        },
+        text: {
+          primary: '#F8FAFC', // Slate 50
+          secondary: '#94A3B8', // Slate 400
+        },
+      }),
     success: {
       main: '#22C55E',
     },
@@ -72,8 +87,19 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(241, 245, 249, 1)',
+          boxShadow: mode === 'light'
+            ? '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.18)',
+          border: mode === 'light'
+            ? '1px solid rgba(241, 245, 249, 1)'
+            : '1px solid rgba(51, 65, 85, 1)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
         },
       },
     },
@@ -169,7 +195,10 @@ function AppRoutes() {
   );
 }
 
-function App() {
+function MainApp() {
+  const { mode } = useColorMode();
+  const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -179,6 +208,14 @@ function App() {
         </AuthProvider>
       </Router>
     </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <ColorModeProvider>
+      <MainApp />
+    </ColorModeProvider>
   );
 }
 

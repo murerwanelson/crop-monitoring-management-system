@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Updated to localhost for development
+const API_BASE_URL = 'http://10.72.32.168:8000/api'; // Updated to current local IP
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -109,6 +109,11 @@ export const getObservation = async (id) => {
     return response.data;
 };
 
+export const getObservationsAnalytics = async () => {
+    const response = await api.get('/observations/analytics_data/');
+    return response.data;
+};
+
 export const createObservation = async (data) => {
     const response = await api.post('/observations/', data);
     return response.data;
@@ -129,14 +134,33 @@ export const getDashboardStats = async (days = 30) => {
     return response.data;
 };
 
-export const getMoistureTrends = async (days = 30) => {
-    const response = await api.get(`/stats/moisture_trends/?days=${days}`);
+export const getMoistureTrends = async (days = 30, fieldId = null) => {
+    const url = `/stats/moisture_trends/?days=${days}${fieldId ? `&field_id=${fieldId}` : ''}`;
+    const response = await api.get(url);
     return response.data;
 };
 
-export const getGrowthAnalysis = async (cropVariety = null) => {
-    const url = `/stats/growth_analysis/${cropVariety ? `?crop_variety=${cropVariety}` : ''}`;
+export const getGrowthAnalysis = async (cropVariety = null, fieldId = null) => {
+    let url = '/stats/growth_analysis/';
+    const params = new URLSearchParams();
+    if (cropVariety) params.append('crop_variety', cropVariety);
+    if (fieldId) params.append('field_id', fieldId);
+
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+
     const response = await api.get(url);
+    return response.data;
+};
+
+
+export const getInsights = async (days = 30) => {
+    const response = await api.get(`/stats/insights/?days=${days}`);
+    return response.data;
+};
+
+export const getAdvancedAnalytics = async (days = 30) => {
+    const response = await api.get(`/stats/advanced/?days=${days}`);
     return response.data;
 };
 

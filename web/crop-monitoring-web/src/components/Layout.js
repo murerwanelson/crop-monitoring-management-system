@@ -24,7 +24,10 @@ import {
     Menu as MenuIcon,
     NaturePeople as LogoIcon,
     Group as UsersIcon,
+    DarkModeOutlined,
+    LightModeOutlined,
 } from '@mui/icons-material';
+import { useColorMode } from '../contexts/ThemeContext';
 
 const menuItems = [
     { text: 'Home', icon: <HomeIcon />, path: '/' },
@@ -40,6 +43,7 @@ const Layout = ({ children }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const { mode, toggleColorMode } = useColorMode();
 
     // Mobile Menu State
     const [anchorElNav, setAnchorElNav] = useState(null);
@@ -85,8 +89,11 @@ const Layout = ({ children }) => {
                 elevation={0}
                 className="glass-effect"
                 sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.7)',
-                    borderBottom: '1px solid rgba(0,0,0,0.05)',
+                    bgcolor: mode === 'light' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(15, 23, 42, 0.7)',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    backdropFilter: 'blur(10px)',
+                    color: 'text.primary',
                 }}
             >
                 <Container maxWidth="xl">
@@ -218,6 +225,21 @@ const Layout = ({ children }) => {
                                 );
                             })}
                         </Box>
+
+                        {/* DARK MODE TOGGLE */}
+                        <Tooltip title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}>
+                            <IconButton
+                                onClick={toggleColorMode}
+                                sx={{
+                                    mr: 1,
+                                    bgcolor: mode === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)',
+                                    borderRadius: 3,
+                                    p: 1.2
+                                }}
+                            >
+                                {mode === 'light' ? <DarkModeOutlined /> : <LightModeOutlined />}
+                            </IconButton>
+                        </Tooltip>
 
                         {/* USER SETTINGS */}
                         <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 2 }}>

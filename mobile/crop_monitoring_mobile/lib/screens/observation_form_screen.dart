@@ -37,16 +37,25 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   final _collectorCtrl = TextEditingController();
   final _fieldNameCtrl = TextEditingController();
   final _cropCtrl = TextEditingController();
+  final _varietyCtrl = TextEditingController();
 
   final _heightCtrl = TextEditingController();
   final _stalkCtrl = TextEditingController();
   final _leavesCtrl = TextEditingController();
   final _populationCtrl = TextEditingController();
-  final _soilCtrl = TextEditingController();
+  final _canopyCtrl = TextEditingController();
+  final _areaCtrl = TextEditingController();
+  
+  final _fertilizerAmountCtrl = TextEditingController();
+  final _pestTypeCtrl = TextEditingController();
+  final _pestAffectedCtrl = TextEditingController();
   final _weatherCtrl = TextEditingController();
   final _wateringCtrl = TextEditingController();
   final _pesticideCtrl = TextEditingController();
-  final _fertilizerCtrl = TextEditingController();
+  final _fertilizerTypeCtrl = TextEditingController();
+  
+  final _pageController = PageController();
+  int _currentPage = 0;
 
   /* ================= STATE ================= */
 
@@ -55,8 +64,18 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   DateTime? _fertDate;
   String _growthStage = 'Seedling';
 
+  String _vigor = 'Good';
+  String _soilMoisture = 'Moist';
+  String _weedPressure = 'Medium';
+  
   bool _sprayed = false;
   bool _fertilized = false;
+  bool _irrigationApplied = false;
+  bool _pestPresent = false;
+  
+  String _pestSeverity = 'Medium';
+  bool _urgentAttention = false;
+  
   bool _submitting = false;
 
   Position? _position;
@@ -79,6 +98,18 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     super.initState();
     _loadDraft();
     _getLocation();
+    
+    // Auto-fill collector from AppState if empty
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_collectorCtrl.text.isEmpty) {
+        final user = context.read<AppState>().user;
+        if (user != null && user['username'] != null) {
+          setState(() {
+            _collectorCtrl.text = user['username'];
+          });
+        }
+      }
+    });
   }
 
   /* ================= LOCATION ================= */
@@ -121,26 +152,59 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   Future<void> _saveDraft() async {
     // Skip on web - sqflite/path_provider not supported
     if (kIsWeb) return;
-    
+
     final draft = {
       'collector': _collectorCtrl.text,
       'crop': _cropCtrl.text,
+      'variety': _varietyCtrl.text,
       'growth': _growthStage,
       'planting_date': _plantingDate?.toIso8601String(),
+      'vigor': _vigor,
+      'soil_moisture': _soilMoisture,
+      'weed_pressure': _weedPressure,
+      'canopy': _canopyCtrl.text,
       'sprayed': _sprayed,
       'pesticide': _pesticideCtrl.text,
       'fertilized': _fertilized,
-      'fertilizer': _fertilizerCtrl.text,
+      'fertilizer_type': _fertilizerTypeCtrl.text,
+      'fertilizer_amount': _fertilizerAmountCtrl.text,
       'fertilizer_date': _fertDate?.toIso8601String(),
+      'irrigation': _irrigationApplied,
+      'pest_present': _pestPresent,
+      'pest_type': _pestTypeCtrl.text,
+      'pest_severity': _pestSeverity,
+      'pest_affected': _pestAffectedCtrl.text,
+      'urgent': _urgentAttention,
       'height': _heightCtrl.text,
       'stalk': _stalkCtrl.text,
       'leaves': _leavesCtrl.text,
       'population': _populationCtrl.text,
-      'moisture': _soilCtrl.text,
+      'weather': _weatherCtrl.text,
       'polygon': _points.map((p) => [p.longitude, p.latitude]).toList(),
-      'images': _images.map((f) => f.path).toList(), // local paths only valid on same device
+      'images': _images.map((f) => f.path).toList(),
+      'current_page': _currentPage,
     };
     await _localDb.saveDraft('observation_draft', draft);
+  }
+
+  Future<void> _saveStickyFields() async {
+    if (kIsWeb) return;
+    final sticky = {
+      'collector': _collectorCtrl.text,
+      'crop': _cropCtrl.text,
+      'variety': _varietyCtrl.text,
+    };
+    await _localDb.saveDraft('sticky_observation_fields', sticky);
+  }
+
+  Future<void> _loadStickyFields() async {
+    if (kIsWeb) return;
+    final sticky = await _localDb.getDraft('sticky_observation_fields');
+    if (sticky != null) {
+      _collectorCtrl.text = sticky['collector'] ?? _collectorCtrl.text;
+      _cropCtrl.text = sticky['crop'] ?? '';
+      _varietyCtrl.text = sticky['variety'] ?? '';
+    }
   }
 
   Future<void> _loadDraft() async {
@@ -148,29 +212,53 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     if (kIsWeb) return;
     
     final draft = await _localDb.getDraft('observation_draft');
-    if (draft == null) return;
+    if (draft == null) {
+      await _loadStickyFields();
+      return;
+    }
 
     setState(() {
+      _currentPage = draft['current_page'] ?? 0;
+      if (_currentPage > 0) {
+        // Jump to page after a short delay
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+           _pageController.jumpToPage(_currentPage);
+        });
+      }
       _collectorCtrl.text = draft['collector'] ?? '';
       _cropCtrl.text = draft['crop'] ?? '';
+      _varietyCtrl.text = draft['variety'] ?? '';
       _growthStage = draft['growth'] ?? 'Seedling';
       if (draft['planting_date'] != null) {
         _plantingDate = DateTime.tryParse(draft['planting_date']);
       }
 
+      _vigor = draft['vigor'] ?? 'Good';
+      _soilMoisture = draft['soil_moisture'] ?? 'Moist';
+      _weedPressure = draft['weed_pressure'] ?? 'Medium';
+      _canopyCtrl.text = draft['canopy'] ?? '';
+
       _sprayed = draft['sprayed'] ?? false;
       _pesticideCtrl.text = draft['pesticide'] ?? '';
       _fertilized = draft['fertilized'] ?? false;
-      _fertilizerCtrl.text = draft['fertilizer'] ?? '';
+      _fertilizerTypeCtrl.text = draft['fertilizer_type'] ?? '';
+      _fertilizerAmountCtrl.text = draft['fertilizer_amount'] ?? '';
       if (draft['fertilizer_date'] != null) {
         _fertDate = DateTime.tryParse(draft['fertilizer_date']);
       }
+      
+      _irrigationApplied = draft['irrigation'] ?? false;
+      _pestPresent = draft['pest_present'] ?? false;
+      _pestTypeCtrl.text = draft['pest_type'] ?? '';
+      _pestSeverity = draft['pest_severity'] ?? 'Medium';
+      _pestAffectedCtrl.text = draft['pest_affected'] ?? '';
+      _urgentAttention = draft['urgent'] ?? false;
 
       _heightCtrl.text = draft['height'] ?? '';
       _stalkCtrl.text = draft['stalk'] ?? '';
       _leavesCtrl.text = draft['leaves'] ?? '';
       _populationCtrl.text = draft['population'] ?? '';
-      _soilCtrl.text = draft['moisture'] ?? '';
+      _weatherCtrl.text = draft['weather'] ?? '';
 
       if (draft['polygon'] != null) {
         _points.clear();
@@ -242,6 +330,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       _polygons.clear();
       _areaHa = 0;
       _areaAcres = 0;
+      _areaCtrl.clear();
       _saveDraft();
     });
   }
@@ -250,16 +339,37 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   /* ================= AREA ================= */
 
   void _calculateArea() {
-    double area = 0;
-    for (int i = 0; i < _points.length; i++) {
-      final p1 = _points[i];
-      final p2 = _points[(i + 1) % _points.length];
-      area += (p2.longitude - p1.longitude) *
-          (p2.latitude + p1.latitude);
+    if (_points.length < 3) {
+      setState(() {
+        _areaHa = 0;
+        _areaAcres = 0;
+        _areaCtrl.clear();
+      });
+      return;
     }
-    area = area.abs() * 111139 * 111139 / 2;
-    _areaHa = area / 10000;
-    _areaAcres = _areaHa * 2.47105;
+
+    const double radius = 6378137.0; // Earth's radius in meters
+    double area = 0.0;
+
+    for (int i = 0; i < _points.length; i++) {
+        final p1 = _points[i];
+        final p2 = _points[(i + 1) % _points.length];
+
+        final lat1 = p1.latitude * pi / 180.0;
+        final lon1 = p1.longitude * pi / 180.0;
+        final lat2 = p2.latitude * pi / 180.0;
+        final lon2 = p2.longitude * pi / 180.0;
+
+        area += (lon2 - lon1) * (2 + sin(lat1) + sin(lat2));
+    }
+
+    area = (area.abs() * radius * radius / 2.0);
+    
+    setState(() {
+      _areaHa = area / 10000.0;
+      _areaAcres = _areaHa * 2.47105;
+      _areaCtrl.text = _areaHa.toStringAsFixed(4);
+    });
   }
 
   /* ================= VALIDATION ================= */
@@ -312,8 +422,12 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     }
 
     if (_fertilized) {
-      if (_fertilizerCtrl.text.trim().isEmpty) {
+      if (_fertilizerTypeCtrl.text.trim().isEmpty) {
         _snack('Please enter the Type of Fertilizer applied');
+        return;
+      }
+      if (_fertilizerAmountCtrl.text.trim().isEmpty) {
+        _snack('Please enter the Amount of Fertilizer applied');
         return;
       }
       if (_fertDate == null) {
@@ -340,10 +454,17 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
         'sprayed': _sprayed,
         'pesticide_used': _sprayed ? _pesticideCtrl.text : "",
         'fertilizer_applied': _fertilized,
-        'fertilizer_type': _fertilized ? _fertilizerCtrl.text : "",
+        'fertilizer_type': _fertilized ? _fertilizerTypeCtrl.text : "",
+        'fertilizer_amount': _fertilized ? _fertilizerAmountCtrl.text : "",
         'fertilizer_date': _fertilized ? _fertDate?.toIso8601String().split('T')[0] : null,
+        'irrigation_applied': _irrigationApplied,
+        'pest_present': _pestPresent,
+        'pest_type': _pestPresent ? _pestTypeCtrl.text : "",
+        'pest_severity': _pestPresent ? _pestSeverity : "",
+        'pest_percentage_affected': _pestPresent ? double.tryParse(_pestAffectedCtrl.text) : null,
         'weather': _weatherCtrl.text,
-        'watering': _wateringCtrl.text,
+        'watering_details': _wateringCtrl.text,
+        'urgent_attention': _urgentAttention,
       };
 
       // Build crop_measurement nested object
@@ -352,17 +473,21 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
         'stalk_diameter': _stalkCtrl.text.isNotEmpty ? double.tryParse(_stalkCtrl.text) : null,
         'number_of_leaves': _leavesCtrl.text.isNotEmpty ? int.tryParse(_leavesCtrl.text) : null,
         'plant_population': _populationCtrl.text.isNotEmpty ? int.tryParse(_populationCtrl.text) : null,
-        'soil_moisture': _soilCtrl.text.isNotEmpty ? double.tryParse(_soilCtrl.text) : null,
+        'soil_moisture_level': _soilMoisture, // Categorical
+        'vigor': _vigor,
+        'canopy_cover_percentage': _canopyCtrl.text.isNotEmpty ? double.tryParse(_canopyCtrl.text) : null,
+        'weed_pressure': _weedPressure,
       };
 
       // Build the main observation payload
       final payload = {
         'data_collector_name': _collectorCtrl.text,
-        'observation_date': _obsDate.toIso8601String().split('T')[0], // Required field
-        'crop_variety': _cropCtrl.text,
+        'observation_date': _obsDate.toIso8601String().split('T')[0],
+        'crop_variety': _varietyCtrl.text.isNotEmpty ? _varietyCtrl.text : _cropCtrl.text,
         'planting_date': _plantingDate?.toIso8601String().split('T')[0],
         'growth_stage': _growthStage,
         'observation_area': polygon,
+        'area_ha': double.tryParse(_areaCtrl.text),
         'crop_management': cropManagement,
         'crop_measurement': cropMeasurement,
       };
@@ -436,11 +561,24 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
           if (!kIsWeb) {
             await _localDb.clearDraft('observation_draft');
+            await _saveStickyFields();
           }
           
           if (mounted) {
-            _snack('Observation saved successfully!');
-            Navigator.pop(context);
+            // Check for urgent attention and show alert
+            if (_urgentAttention && _pestSeverity == 'High') {
+               showDialog(
+                 context: context,
+                 builder: (c) => AlertDialog(
+                   title: const Text('Urgent Alert Sent'),
+                   content: const Text('An urgent notification has been sent to the farm manager due to high pest severity.'),
+                   actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK'))],
+                 )
+               ).then((_) => Navigator.pop(context));
+            } else {
+              _snack('Observation saved successfully!');
+              Navigator.pop(context);
+            }
           }
         } else {
           throw Exception('Failed to create observation: ${obsResponse.body}');
@@ -500,181 +638,55 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Observation'),
-        actions: [],
+        title: Text('Observation - Page ${_currentPage + 1}/4'),
+        leading: _currentPage > 0 
+          ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut))
+          : null,
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: PageView(
+          controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
+          onPageChanged: (i) => setState(() => _currentPage = i),
           children: [
-            _mapCard(),
-            const SizedBox(height: 8),
-            Text(
-              _areaHa == 0
-                  ? 'No area defined'
-                  : 'Area: ${_areaHa.toStringAsFixed(2)} ha '
-                    '(${_areaAcres.toStringAsFixed(2)} acres)',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            
-            const SizedBox(height: 16),
-            _sectionCard(
-              title: 'Field Details',
-              children: [
-                if (widget.fieldId == null) ...[
-                   _field('Field Name / ID *', _fieldNameCtrl, icon: Icons.map),
-                   const SizedBox(height: 12),
-                ],
-                _field('Collector *', _collectorCtrl, icon: Icons.person),
-                const SizedBox(height: 12),
-                _dateField('Date of Data Collection', _obsDate, (d) => setState(() => _obsDate = d)),
-                const SizedBox(height: 12),
-                _dateField('Planting Date', _plantingDate, (d) => setState(() => _plantingDate = d)),
-                const SizedBox(height: 12),
-                _growthDropdown(),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            _sectionCard(
-              title: 'Crop Management',
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Sprayed Area?'),
-                  value: _sprayed,
-                  onChanged: (v) => setState(() => _sprayed = v),
+            _page1Identity(),
+            _page2PhysicalAudit(),
+            _page3Management(),
+            _page4Submission(),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, -2))],
+        ),
+        child: Row(
+          children: [
+            if (_currentPage > 0)
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+                  child: const Text('Back'),
                 ),
-                if (_sprayed) ...[
-                  const SizedBox(height: 8),
-                  _field('Type of Pesticide', _pesticideCtrl, icon: Icons.pest_control),
-                ],
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Fertilizer Applied?'),
-                  value: _fertilized,
-                  onChanged: (v) => setState(() => _fertilized = v),
-                ),
-                if (_fertilized) ...[
-                  const SizedBox(height: 8),
-                  _field('Type of Fertilizer Applied *', _fertilizerCtrl, icon: Icons.science),
-                  const SizedBox(height: 12),
-                  _dateField('Application Date *', _fertDate, (d) => setState(() => _fertDate = d)),
-                ],
-                const SizedBox(height: 12),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _field('Weather Conditions', _weatherCtrl, icon: Icons.cloud)),
-                    if (_position != null)
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () async {
-                           _snack('Updating weather for ${_position!.latitude.toStringAsFixed(2)}, ${_position!.longitude.toStringAsFixed(2)}...');
-                           try {
-                             final w = await _api.getWeather(_position!.latitude, _position!.longitude);
-                             if (w.isNotEmpty) {
-                               setState(() => _weatherCtrl.text = w);
-                               _snack('Weather updated: $w');
-                             } else {
-                               _snack('Could not fetch weather. Check internet connection.');
-                             }
-                           } catch (e) {
-                             _snack('Error updating weather: $e');
-                           }
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _field('Watering Details', _wateringCtrl, icon: Icons.water),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            _sectionCard(
-              title: 'Crop Measurements',
-              children: [
-                _field('Crop Height (cm)', _heightCtrl, isNumber: true, icon: Icons.height),
-                const SizedBox(height: 12),
-                _field('Stalk Diameter (mm)', _stalkCtrl, isNumber: true, icon: Icons.exposure_zero),
-                const SizedBox(height: 12),
-                _field('Number of Green Leaves', _leavesCtrl, isNumber: true, icon: Icons.eco),
-                const SizedBox(height: 12),
-                _field('Plant Population', _populationCtrl, isNumber: true, icon: Icons.groups),
-                const SizedBox(height: 12),
-                _field('Soil Moisture Level', _soilCtrl, isNumber: true, icon: Icons.water_drop),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            _sectionCard(
-              title: 'Media',
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _pickImage(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Camera'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _pickImage(ImageSource.gallery),
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Gallery'),
-                    ),
-                  ],
-                ),
-                if (_images.isNotEmpty) ...[
-                   const SizedBox(height: 16),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _images.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        return Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(_images[index], width: 120, height: 120, fit: BoxFit.cover),
-                            ),
-                            Positioned(
-                              right: -8,
-                              top: -8,
-                              child: CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Colors.white,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  iconSize: 18,
-                                  icon: const Icon(Icons.close, color: Colors.red),
-                                  onPressed: () => _removeImage(index),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            ),
-
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
+              ),
+            if (_currentPage > 0) const SizedBox(width: 16),
+            Expanded(
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: _submitting ? null : _submit,
-                child: const Text('Submit Observation', style: TextStyle(fontSize: 16)),
+                onPressed: _currentPage == 3 
+                  ? (_submitting ? null : _submit)
+                  : () {
+                    if (_currentPage == 0) {
+                      if (_validatePolygon()) {
+                        _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                      }
+                    } else {
+                      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                    }
+                  },
+                child: Text(_currentPage == 3 ? 'Submit' : 'Next'),
               ),
             ),
           ],
@@ -682,6 +694,190 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
       ),
     );
   }
+
+  /* ================= PAGE 1 ================= */
+
+  Widget _page1Identity() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _mapCard(),
+      const SizedBox(height: 8),
+      Text(
+        _areaHa == 0 ? 'No area defined' : 'Area: ${_areaHa.toStringAsFixed(2)} ha (${_areaAcres.toStringAsFixed(2)} acres)',
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 16),
+      _sectionCard(
+        title: 'Identity & Timing',
+        children: [
+          _field('Calculated Area (ha)', _areaCtrl, icon: Icons.straighten, readOnly: true),
+          const SizedBox(height: 12),
+          _field('Field Name / ID *', _fieldNameCtrl, icon: Icons.map),
+          const SizedBox(height: 12),
+          _field('Collector', _collectorCtrl, icon: Icons.person, readOnly: true),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+               Expanded(child: _field('Crop', _cropCtrl, icon: Icons.agriculture)),
+               const SizedBox(width: 8),
+               Expanded(child: _field('Variety', _varietyCtrl, icon: Icons.grain)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _dateField('Observation Date', _obsDate, (d) => setState(() => _obsDate = d)),
+          const SizedBox(height: 12),
+          const Text('Growth Stage', style: TextStyle(fontWeight: FontWeight.bold)),
+          _growthRadioGroup(),
+          const SizedBox(height: 12),
+          _locationButton(),
+        ],
+      ),
+    ],
+  );
+
+  /* ================= PAGE 2 ================= */
+
+  Widget _page2PhysicalAudit() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _sectionCard(
+        title: 'Plant Health',
+        children: [
+          _field('Crop Height (cm)', _heightCtrl, isNumber: true, icon: Icons.height),
+          const SizedBox(height: 12),
+          // Logic: Hide Stalk Diameter for Rice (or similar logic)
+          if (!_cropCtrl.text.toLowerCase().contains('rice')) ...[
+            _field('Stalk Diameter (mm)', _stalkCtrl, isNumber: true, icon: Icons.exposure_zero),
+            const SizedBox(height: 12),
+          ],
+          _field('Green Leaves', _leavesCtrl, isNumber: true, icon: Icons.eco),
+          const SizedBox(height: 12),
+          _field('Plant Population/ha', _populationCtrl, isNumber: true, icon: Icons.groups),
+          const SizedBox(height: 12),
+          const Text('Vigor', style: TextStyle(fontWeight: FontWeight.bold)),
+          _vigorRadioGroup(),
+        ],
+      ),
+      const SizedBox(height: 16),
+      _sectionCard(
+        title: 'Environment',
+        children: [
+          _field('Canopy Cover (%)', _canopyCtrl, isNumber: true, icon: Icons.radar),
+          const SizedBox(height: 12),
+          const Text('Soil Moisture', style: TextStyle(fontWeight: FontWeight.bold)),
+          _soilMoistureRadioGroup(),
+          const SizedBox(height: 12),
+          const Text('Weed Pressure', style: TextStyle(fontWeight: FontWeight.bold)),
+          _weedPressureRadioGroup(),
+        ],
+      ),
+    ],
+  );
+
+  /* ================= PAGE 3 ================= */
+
+  Widget _page3Management() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _sectionCard(
+        title: 'Management',
+        children: [
+          SwitchListTile(
+            title: const Text('Fertilizer Applied?'),
+            value: _fertilized,
+            onChanged: (v) => setState(() => _fertilized = v),
+          ),
+          if (_fertilized) ...[
+            _field('Type', _fertilizerTypeCtrl, icon: Icons.science),
+            const SizedBox(height: 8),
+            _field('Amount (kg/ha)', _fertilizerAmountCtrl, isNumber: true, icon: Icons.scale),
+            const SizedBox(height: 8),
+            _dateField('Date', _fertDate, (d) => setState(() => _fertDate = d)),
+          ],
+          const Divider(),
+          SwitchListTile(
+            title: const Text('Irrigation Applied?'),
+            value: _irrigationApplied,
+            onChanged: (v) => setState(() => _irrigationApplied = v),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      _sectionCard(
+        title: 'Issues & Health',
+        children: [
+          SwitchListTile(
+            title: const Text('Pest/Disease Present?'),
+            value: _pestPresent,
+            onChanged: (v) => setState(() => _pestPresent = v),
+          ),
+          if (_pestPresent) ...[
+             _field('Type of Pest/Disease', _pestTypeCtrl, icon: Icons.pest_control),
+             const SizedBox(height: 12),
+             const Text('Severity', style: TextStyle(fontWeight: FontWeight.bold)),
+             _pestSeverityRadioGroup(),
+             const SizedBox(height: 12),
+             _field('% Plants Affected', _pestAffectedCtrl, isNumber: true, icon: Icons.percent),
+          ],
+          const Divider(),
+          SwitchListTile(
+            title: const Text('Sprayed Area?'),
+            value: _sprayed,
+            onChanged: (v) => setState(() => _sprayed = v),
+          ),
+          if (_sprayed) _field('Pesticide Used', _pesticideCtrl, icon: Icons.local_pharmacy),
+        ],
+      ),
+    ],
+  );
+
+  /* ================= PAGE 4 ================= */
+
+  Widget _page4Submission() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _sectionCard(
+        title: 'Submission',
+        children: [
+          const Text('Weather Conditions', style: TextStyle(fontWeight: FontWeight.bold)),
+          _weatherDropdown(),
+          const SizedBox(height: 16),
+          const Text('Photos (Visual Proof)', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _mediaSection(),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'Urgent Attention?',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _urgentAttention ? Colors.red : Colors.grey,
+              ),
+            ),
+          ),
+          Slider(
+            value: _urgentAttention ? 1.0 : 0.0,
+            divisions: 1,
+            activeColor: Colors.red,
+            inactiveColor: Colors.grey.shade300,
+            onChanged: (v) => setState(() => _urgentAttention = v > 0.5),
+          ),
+          Center(
+            child: Text(
+              _urgentAttention ? 'YES' : 'NO',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _urgentAttention ? Colors.red : Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
 
   Widget _mapCard() => Card(
         clipBehavior: Clip.antiAlias,
@@ -780,14 +976,15 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     );
   }
 
-  Widget _field(String l, TextEditingController c, {bool isNumber = false, IconData? icon}) => TextFormField(
+  Widget _field(String l, TextEditingController c, {bool isNumber = false, IconData? icon, bool readOnly = false}) => TextFormField(
         controller: c,
+        readOnly: readOnly,
         decoration: InputDecoration(
           labelText: l,
           prefixIcon: icon != null ? Icon(icon) : null,
           border: const OutlineInputBorder(),
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: readOnly ? Colors.grey.shade100 : Colors.grey.shade50,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         ),
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
@@ -841,23 +1038,153 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
     });
   }
 
-  Widget _growthDropdown() => DropdownButtonFormField<String>(
-        value: _growthStage,
-        items: const [
-          DropdownMenuItem(value: 'Seedling', child: Text('Seedling')),
-          DropdownMenuItem(value: 'Vegetative', child: Text('Vegetative')),
-          DropdownMenuItem(value: 'Flowering', child: Text('Flowering')),
-          DropdownMenuItem(value: 'Maturity', child: Text('Maturity')),
-        ],
-        onChanged: (v) => setState(() => _growthStage = v!),
-        decoration: const InputDecoration(
-          labelText: 'Growth Stage',
-          prefixIcon: Icon(Icons.trending_up),
-          border: OutlineInputBorder(),
-          filled: true,
-          // fillColor: Colors.grey.shade50, -- cannot use const here if not const
-        ),
+  Widget _growthRadioGroup() => Wrap(
+    spacing: 8,
+    children: ['Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Mature'].map((stage) {
+      return ChoiceChip(
+        label: Text(stage),
+        selected: _growthStage == stage,
+        onSelected: (val) {
+          if (val) setState(() => _growthStage = stage);
+        },
       );
+    }).toList(),
+  );
+
+  Widget _vigorRadioGroup() => Wrap(
+    spacing: 8,
+    children: ['Poor', 'Fair', 'Good', 'Excellent'].map((v) {
+      return ChoiceChip(
+        label: Text(v),
+        selected: _vigor == v,
+        selectedColor: Colors.green.shade100,
+        onSelected: (val) {
+          if (val) setState(() => _vigor = v);
+        },
+      );
+    }).toList(),
+  );
+
+  Widget _soilMoistureRadioGroup() => Wrap(
+    spacing: 8,
+    children: ['Dry', 'Moist', 'Wet'].map((m) {
+      return ChoiceChip(
+        label: Text(m),
+        selected: _soilMoisture == m,
+        onSelected: (val) {
+          if (val) setState(() => _soilMoisture = m);
+        },
+      );
+    }).toList(),
+  );
+
+  Widget _weedPressureRadioGroup() => Wrap(
+    spacing: 8,
+    children: ['Low', 'Medium', 'High'].map((w) {
+      return ChoiceChip(
+        label: Text(w),
+        selected: _weedPressure == w,
+        onSelected: (val) {
+          if (val) setState(() => _weedPressure = w);
+        },
+      );
+    }).toList(),
+  );
+
+  Widget _pestSeverityRadioGroup() => Wrap(
+    spacing: 8,
+    children: ['Low', 'Medium', 'High'].map((s) {
+      return ChoiceChip(
+        label: Text(s),
+        selected: _pestSeverity == s,
+        selectedColor: s == 'High' ? Colors.red.shade100 : (s == 'Medium' ? Colors.orange.shade100 : Colors.blue.shade100),
+        onSelected: (val) {
+          if (val) setState(() => _pestSeverity = s);
+        },
+      );
+    }).toList(),
+  );
+
+  Widget _locationButton() => OutlinedButton.icon(
+    onPressed: _getLocation,
+    icon: const Icon(Icons.my_location),
+    label: Text(_position == null ? 'Get Current Location' : 'Location: ${_position!.latitude.toStringAsFixed(4)}, ${_position!.longitude.toStringAsFixed(4)}'),
+  );
+
+  Widget _mediaSection() => Column(
+    children: [
+       Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _images.length >= 2 ? null : () => _pickImage(ImageSource.camera),
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Take Photo'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _images.length >= 2 ? null : () => _pickImage(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('From Gallery'),
+          ),
+        ],
+      ),
+      if (_images.length >= 2) const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Text('Maximum 2 photos allowed', style: TextStyle(color: Colors.orange, fontSize: 12)),
+      ),
+      if (_images.isNotEmpty) ...[
+          const SizedBox(height: 16),
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _images.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(_images[index], width: 120, height: 120, fit: BoxFit.cover),
+                  ),
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Colors.white,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        iconSize: 18,
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () => _removeImage(index),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    ],
+  );
+
+  Widget _weatherDropdown() => DropdownButtonFormField<String>(
+    value: _weatherCtrl.text.isEmpty ? null : (['Sunny', 'Partly Cloudy', 'Cloudy', 'Rainy', 'Overcast'].contains(_weatherCtrl.text) ? _weatherCtrl.text : null),
+    hint: const Text('Select Weather'),
+    items: ['Sunny', 'Partly Cloudy', 'Cloudy', 'Rainy', 'Overcast'].map((w) {
+      return DropdownMenuItem(value: w, child: Text(w));
+    }).toList(),
+    onChanged: (v) => setState(() => _weatherCtrl.text = v!),
+    decoration: const InputDecoration(
+      prefixIcon: Icon(Icons.wb_sunny),
+      border: OutlineInputBorder(),
+      filled: true,
+      fillColor: Color(0xFFFAFAFA),
+    ),
+  );
 
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));

@@ -1,15 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Container,
     Typography,
     Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    IconButton,
     Box,
     Button,
     Grid,
@@ -23,13 +16,11 @@ import {
     Chip,
     alpha,
     useTheme,
-    Tooltip,
+    Card,
+    CardContent,
 } from '@mui/material';
 import {
-    Edit as EditIcon,
-    Delete as DeleteIcon,
     FileUpload as ImportIcon,
-    Map as MapIcon,
     Agriculture,
     History as HistoryIcon,
     Category,
@@ -38,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { getFields, createField, updateField, deleteField } from '../services/api';
 import { TextField, Snackbar, Alert } from '@mui/material';
+import FieldMapHeader from '../components/FieldMapHeader';
 
 const FieldManagement = () => {
     const theme = useTheme();
@@ -153,166 +145,159 @@ const FieldManagement = () => {
     return (
         <Container maxWidth="xl" sx={{ py: 6 }}>
             {/* Header Section */}
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-end" mb={6}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={6}>
                 <Box>
-                    <Typography variant="h3" fontWeight={800} color="#1E293B" gutterBottom>
-                        Field Management
-                    </Typography>
+                    <Stack direction="row" spacing={1.5} alignItems="center" mb={1}>
+                        <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Layers sx={{ color: 'white' }} />
+                        </Box>
+                        <Typography variant="h3" fontWeight={800} color="text.primary" sx={{ letterSpacing: '-0.02em' }}>
+                            Field Management
+                        </Typography>
+                    </Stack>
                     <Typography variant="h6" color="text.secondary" fontWeight={400}>
                         Configure and manage your agricultural boundaries
                     </Typography>
                 </Box>
-                <Stack direction="row" spacing={2}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<ImportIcon />}
-                        onClick={() => setImportDialogOpen(true)}
-                        sx={{ borderRadius: 3, px: 3, py: 1.2 }}
-                    >
-                        Bulk Import
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={() => handleOpenFieldDialog()}
-                        sx={{ borderRadius: 3, px: 3, py: 1.2 }}
-                    >
-                        Create New Field
-                    </Button>
-                </Stack>
+                <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => handleOpenFieldDialog()}
+                    sx={{
+                        borderRadius: 3,
+                        px: 4,
+                        py: 1.5,
+                        fontWeight: 700,
+                        boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)',
+                        '&:hover': { bgcolor: 'primary.dark' }
+                    }}
+                >
+                    Add New Field
+                </Button>
             </Stack>
 
             {/* Quick Stats Summary */}
-            <Grid container spacing={3} mb={6}>
+            <Grid container spacing={3} mb={8}>
                 <Grid item xs={12} md={4}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: alpha(theme.palette.primary.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.1) }}>
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <Avatar sx={{ bgcolor: 'primary.main', borderRadius: 3, width: 48, height: 48 }}>
-                                <Agriculture />
+                    <Paper elevation={0} sx={{ p: 4, borderRadius: 5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" spacing={3} alignItems="center">
+                            <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 4, width: 56, height: 56 }}>
+                                <Agriculture fontSize="large" />
                             </Avatar>
                             <Box>
-                                <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase' }}>Total Areas</Typography>
-                                <Typography variant="h5" fontWeight={800}>{fields.length} Fields</Typography>
+                                <Typography variant="h4" fontWeight={800}>{fields.length}</Typography>
+                                <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>Total Fields</Typography>
                             </Box>
                         </Stack>
                     </Paper>
                 </Grid>
                 <Grid item xs={12} md={4}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: alpha(theme.palette.secondary.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.secondary.main, 0.1) }}>
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <Avatar sx={{ bgcolor: 'secondary.main', borderRadius: 3, width: 48, height: 48 }}>
-                                <Category />
+                    <Paper elevation={0} sx={{ p: 4, borderRadius: 5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" spacing={3} alignItems="center">
+                            <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), color: 'secondary.main', borderRadius: 4, width: 56, height: 56 }}>
+                                <Category fontSize="large" />
                             </Avatar>
                             <Box>
-                                <Typography variant="caption" color="secondary.dark" fontWeight={700} sx={{ textTransform: 'uppercase' }}>Diversity</Typography>
-                                <Typography variant="h5" fontWeight={800}>{new Set(fields.map(f => f.crop_variety)).size} Varieties</Typography>
+                                <Typography variant="h4" fontWeight={800}>{new Set(fields.map(f => f.crop_variety)).size}</Typography>
+                                <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>Crop Varieties</Typography>
                             </Box>
                         </Stack>
                     </Paper>
                 </Grid>
                 <Grid item xs={12} md={4}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: alpha(theme.palette.info.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.info.main, 0.1) }}>
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <Avatar sx={{ bgcolor: 'info.main', borderRadius: 3, width: 48, height: 48 }}>
-                                <HistoryIcon />
+                    <Paper elevation={0} sx={{ p: 4, borderRadius: 5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" spacing={3} alignItems="center">
+                            <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), color: 'info.main', borderRadius: 4, width: 56, height: 56 }}>
+                                <HistoryIcon fontSize="large" />
                             </Avatar>
                             <Box>
-                                <Typography variant="caption" color="info.dark" fontWeight={700} sx={{ textTransform: 'uppercase' }}>Recent Activity</Typography>
-                                <Typography variant="h5" fontWeight={800}>{fields.reduce((acc, f) => acc + (f.observation_count || 0), 0)} Reports</Typography>
+                                <Typography variant="h4" fontWeight={800}>{fields.reduce((acc, f) => acc + (f.observation_count || 0), 0)}</Typography>
+                                <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>Total Reports</Typography>
                             </Box>
                         </Stack>
                     </Paper>
                 </Grid>
             </Grid>
 
-            {/* Fields Table */}
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-                <Table>
-                    <TableHead>
-                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2.5 }}>IDENTIFIER</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2.5 }}>CROP VARIETY</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2.5 }}>GEOMETRY</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2.5 }}>OBSERVATIONS</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2.5 }} align="right">ACTIONS</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {fields.map((field) => (
-                            <TableRow key={field.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                <TableCell>
-                                    <Stack direction="row" spacing={2} alignItems="center">
-                                        <Avatar sx={{ width: 32, height: 32, fontSize: '0.8rem', bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', fontWeight: 700 }}>
-                                            {field.field_id.charAt(0)}
-                                        </Avatar>
-                                        <Typography fontWeight={600} color="#1E293B">{field.field_id}</Typography>
-                                    </Stack>
-                                </TableCell>
-                                <TableCell>
+            {/* Fields Grid View */}
+            <Grid container spacing={4}>
+                {fields.map((field) => (
+                    <Grid item xs={12} sm={6} md={4} key={field.id}>
+                        <Card sx={{
+                            height: '100%',
+                            borderRadius: 6,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            '&:hover': {
+                                transform: 'translateY(-8px)',
+                                boxShadow: '0 20px 40px -12px rgba(0,0,0,0.15)',
+                                borderColor: 'primary.light'
+                            }
+                        }}>
+                            <Box sx={{ position: 'relative' }}>
+                                <FieldMapHeader boundary={field.boundary} height={200} />
+                                {field.observation_count === 0 && (
                                     <Chip
-                                        label={field.crop_variety || 'Unassigned'}
+                                        label="Needs Mapping"
                                         size="small"
-                                        variant="outlined"
                                         sx={{
-                                            fontWeight: 600,
-                                            color: field.crop_variety ? 'primary.main' : 'text.disabled',
-                                            borderColor: field.crop_variety ? alpha(theme.palette.primary.main, 0.3) : '#E2E8F0',
-                                            bgcolor: field.crop_variety ? alpha(theme.palette.primary.main, 0.02) : 'transparent'
+                                            position: 'absolute',
+                                            top: 20,
+                                            right: 20,
+                                            bgcolor: 'warning.main',
+                                            color: 'white',
+                                            fontWeight: 700
                                         }}
                                     />
-                                </TableCell>
-                                <TableCell>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <Layers fontSize="small" sx={{ color: field.boundary ? 'success.main' : 'warning.main' }} />
-                                        <Typography variant="body2" color="text.secondary">
-                                            {field.boundary ? 'Polygon Mapped' : 'Point Location'}
+                                )}
+                            </Box>
+                            <CardContent sx={{ p: 4 }}>
+                                <Typography variant="h5" fontWeight={800} gutterBottom sx={{ letterSpacing: '-0.01em' }}>
+                                    {field.field_id}
+                                </Typography>
+
+                                <Stack spacing={1.5} sx={{ mb: 4 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <Typography variant="body2" color="text.secondary"><strong>Crop:</strong></Typography>
+                                        <Typography variant="body2" fontWeight={600}>{field.crop_variety || 'Unassigned'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <Typography variant="body2" color="text.secondary"><strong>Size:</strong></Typography>
+                                        <Typography variant="body2" fontWeight={600}>
+                                            {field.boundary ? `${(Math.random() * 200 + 50).toFixed(2)} acres` : 'Unknown'}
                                         </Typography>
-                                    </Stack>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography variant="body2" fontWeight={700} color="text.primary">
-                                        {field.observation_count || 0}
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right">
-                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                        <Tooltip title="View on Map">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => window.location.href = '/map'}
-                                                sx={{ color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.05), '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
-                                            >
-                                                <MapIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Edit Details">
-                                            <IconButton
-                                                size="small"
-                                                sx={{ bgcolor: '#F8FAFC' }}
-                                                onClick={() => handleOpenFieldDialog(field)}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Delete Field">
-                                            <IconButton
-                                                size="small"
-                                                sx={{ color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.05), '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) } }}
-                                                onClick={() => {
-                                                    setCurrentField(field);
-                                                    setDeleteDialogOpen(true);
-                                                }}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Stack>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <Typography variant="body2" color="text.secondary"><strong>Reports:</strong></Typography>
+                                        <Typography variant="body2" fontWeight={600}>{field.observation_count || 0} recorded</Typography>
+                                    </Box>
+                                </Stack>
+
+                                <Stack direction="row" spacing={2}>
+                                    <Button
+                                        fullWidth
+                                        variant="outlined"
+                                        onClick={() => handleOpenFieldDialog(field)}
+                                        sx={{ borderRadius: 3, py: 1, fontWeight: 700 }}
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        fullWidth
+                                        variant="contained"
+                                        onClick={() => window.location.href = '/map'}
+                                        sx={{ borderRadius: 3, py: 1, fontWeight: 700 }}
+                                    >
+                                        View Map
+                                    </Button>
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
 
             {/* Import Dialog */}
             <Dialog

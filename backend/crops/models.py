@@ -44,8 +44,11 @@ class Observation(models.Model):
     planting_date = models.DateField(null=True, blank=True)
     growth_stage = models.CharField(max_length=50, blank=True)
     observation_area = models.PolygonField(null=True, blank=True)
+    urgent_attention = models.BooleanField(default=False)
     synced = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    client_uuid = models.CharField(max_length=100, unique=True, null=True, blank=True, db_index=True)
+    area_ha = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
 
 
 class CropManagement(models.Model):
@@ -54,7 +57,13 @@ class CropManagement(models.Model):
     pesticide_used = models.CharField(max_length=100, blank=True)
     fertilizer_applied = models.BooleanField(null=True)
     fertilizer_type = models.CharField(max_length=100, blank=True)
+    fertilizer_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     fertilizer_date = models.DateField(null=True, blank=True)
+    irrigation_applied = models.BooleanField(null=True)
+    pest_present = models.BooleanField(null=True)
+    pest_type = models.CharField(max_length=100, blank=True)
+    pest_severity = models.CharField(max_length=20, blank=True) # Low, Medium, High
+    pest_percentage_affected = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     weather = models.CharField(max_length=100, blank=True)
     watering = models.CharField(max_length=100, blank=True)
 
@@ -66,6 +75,10 @@ class CropMeasurement(models.Model):
     number_of_leaves = models.IntegerField(null=True)
     plant_population = models.IntegerField(null=True)
     soil_moisture = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+    soil_moisture_level = models.CharField(max_length=20, blank=True) # Dry, Moist, Wet
+    vigor = models.CharField(max_length=20, blank=True) # Poor, Fair, Good, Excellent
+    canopy_cover_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+    weed_pressure = models.CharField(max_length=20, blank=True) # Low, Medium, High
 
 
 class Media(models.Model):

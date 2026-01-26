@@ -180,6 +180,7 @@ class CropMeasurementSerializer(serializers.ModelSerializer):
 class ObservationListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views"""
     field_id = serializers.CharField(source='field.field_id', read_only=True)
+    field_boundary = GeometryField(source='field.boundary', read_only=True)
     collector_name = serializers.CharField(source='data_collector.username', read_only=True)
     observation_area = GeometryField(required=False, allow_null=True)
     
@@ -189,14 +190,23 @@ class ObservationListSerializer(serializers.ModelSerializer):
     pesticide_used = serializers.CharField(source='crop_management.pesticide_used', read_only=True)
     weather = serializers.CharField(source='crop_management.weather', read_only=True)
     watering = serializers.CharField(source='crop_management.watering', read_only=True)
+    urgent_attention = serializers.BooleanField(read_only=True)
+    vigor = serializers.CharField(source='crop_measurement.vigor', read_only=True)
+    observation_image = serializers.SerializerMethodField()
+
+    def get_observation_image(self, obj):
+        media = obj.media_set.first()
+        if media and media.image_url:
+            return media.image_url.url
+        return None
 
     class Meta:
         model = Observation
         fields = [
-            'id', 'field', 'field_id', 'data_collector', 'collector_name', 'data_collector_name',
+            'id', 'field', 'field_id', 'field_boundary', 'data_collector', 'collector_name', 'data_collector_name',
             'observation_date', 'crop_variety', 'planting_date', 'growth_stage', 'observation_area',
             'crop_height', 'soil_moisture', 'fertilizer_type', 'pesticide_used', 'weather', 'watering',
-            'synced', 'created_at'
+            'observation_image', 'synced', 'created_at', 'urgent_attention', 'vigor', 'area_ha'
         ]
 
 
@@ -217,7 +227,7 @@ class ObservationDetailSerializer(serializers.ModelSerializer):
             'id', 'field', 'field_id', 'field_data', 'data_collector', 'collector', 'collector_name', 'data_collector_name',
             'observation_date', 'crop_variety', 'planting_date', 'growth_stage', 'observation_area',
             'crop_management', 'crop_measurement', 'media_items',
-            'synced', 'created_at'
+            'synced', 'created_at', 'urgent_attention', 'area_ha'
         ]
 
 
@@ -230,8 +240,9 @@ class ObservationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Observation
         fields = [
-            'field', 'data_collector', 'data_collector_name', 'observation_date', 'crop_variety',
-            'planting_date', 'growth_stage', 'observation_area', 'crop_management', 'crop_measurement'
+            'id', 'field', 'data_collector', 'data_collector_name', 'observation_date', 'crop_variety',
+            'planting_date', 'growth_stage', 'observation_area', 'crop_management', 'crop_measurement',
+            'client_uuid', 'area_ha'
         ]
         read_only_fields = ['data_collector']
 
@@ -250,11 +261,19 @@ class ObservationCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from .weather_utils import get_weather_description
         
+        # Deduplication based on client_uuid
+        client_uuid = validated_data.get('client_uuid')
+        if client_uuid:
+            existing = Observation.objects.filter(client_uuid=client_uuid).first()
+            if existing:
+                # Return existing if it already exists to achieve idempotency
+                return existing
+
         crop_management_data = validated_data.pop('crop_management', {})
         crop_measurement_data = validated_data.pop('crop_measurement', {})
         
         # Automatic Weather Fetching
-        if not crop_management_data.get('weather'):
+        if not crop_management_data.get('weather') or crop_management_data.get('weather') == "":
             obs_area = validated_data.get('observation_area')
             if obs_area:
                 # Get centroid or first point for weather
@@ -273,6 +292,72 @@ class ObservationCreateSerializer(serializers.ModelSerializer):
         CropMeasurement.objects.create(observation=observation, **crop_measurement_data)
         
         return observation
+
+
+class ObservationAnalyticsSerializer(serializers.ModelSerializer):
+    """
+    Concrete Analytics Serializer designed for the 7-Pillar Analytics Dashboard.
+    Provides deep, flattened, and computed data for complex visualizations.
+    """
+    # 1. Identification & Time
+    field_id = serializers.CharField(source='field.field_id', read_only=True)
+    collector_name = serializers.CharField(source='data_collector.username', read_only=True)
+    
+    # 2-5. Nested Management & Measurements (Fertilizer, Pests, Soil, Growth)
+    crop_management = CropManagementSerializer(read_only=True)
+    crop_measurement = CropMeasurementSerializer(read_only=True)
+    
+    # 6. Media & GPS (Computed)
+    media_items = MediaSerializer(source='media_set', many=True, read_only=True)
+    gps_coordinates = serializers.SerializerMethodField()
+    
+    # Custom Analytics Logic
+    computed_soil_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Observation
+        fields = [
+            'id', 'field', 'field_id', 'data_collector', 'collector_name', 'data_collector_name',
+            'observation_date', 'crop_variety', 'planting_date', 'growth_stage',
+            'crop_management', 'crop_measurement', 'media_items',
+            'gps_coordinates', 'computed_soil_status',
+            'synced', 'created_at', 'urgent_attention', 'area_ha'
+        ]
+
+    def get_gps_coordinates(self, obj):
+        """Combines area centroid or first media point into a single lat/lng pair for mapping"""
+        # Try observation area first
+        if obj.observation_area:
+            centroid = obj.observation_area.centroid
+            return {'lat': centroid.y, 'lng': centroid.x}
+        
+        # Fallback to first image with location
+        first_media = obj.media_set.filter(location__isnull=False).first()
+        if first_media:
+            return {'lat': first_media.location.y, 'lng': first_media.location.x}
+            
+        return None
+
+    def get_computed_soil_status(self, obj):
+        """
+        Ensures moisture level is always available for analytics.
+        If the collector didn't select 'Dry/Wet', it computes it from the raw % value.
+        """
+        measurement = getattr(obj, 'crop_measurement', None)
+        if not measurement:
+            return 'No Data'
+            
+        # Return existing level if provided
+        if measurement.soil_moisture_level:
+            return measurement.soil_moisture_level
+            
+        # Compute from percentage if missing
+        if measurement.soil_moisture is not None:
+            if measurement.soil_moisture < 30: return 'Dry'
+            if measurement.soil_moisture < 70: return 'Moist'
+            return 'Wet'
+            
+        return 'Unknown'
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

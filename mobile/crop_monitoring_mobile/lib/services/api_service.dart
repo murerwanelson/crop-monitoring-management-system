@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
   // Use localhost for Web, 10.0.2.2 for Android Emulator, or your local machine IP
-  // Local machine IP: 10.72.189.171
-  static String get _host => kIsWeb ? 'localhost' : '10.72.189.171';
+  // Local machine IP: 10.72.32.168
+  static String get _host => kIsWeb ? 'localhost' : '10.72.32.168';
   final String serverUrl = 'http://$_host:8000';
   final String apiUrl = 'http://$_host:8000/api';
   final storage = FlutterSecureStorage();

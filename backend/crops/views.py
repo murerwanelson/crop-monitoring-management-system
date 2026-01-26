@@ -1,3 +1,5 @@
+from django.http import HttpResponse
+import csv
 from django.contrib.auth.models import User
 from .permissions import IsAdministrator, IsViewerOrAdministrator, IsFieldManager, IsOwnerOrViewerOrAdministrator
 from rest_framework import viewsets, permissions, status
@@ -18,6 +20,7 @@ from .serializers import (
     ObservationListSerializer,
     ObservationDetailSerializer,
     ObservationCreateSerializer,
+    ObservationAnalyticsSerializer,
     CropManagementSerializer,
     CropMeasurementSerializer,
     MediaSerializer,
@@ -34,7 +37,7 @@ import random
 import string
 from django.core.mail import send_mail
 from rest_framework.generics import CreateAPIView
-from .stats import get_dashboard_stats, get_moisture_trends, get_growth_analysis
+from .stats import get_dashboard_stats, get_moisture_trends, get_growth_analysis, get_insights, get_advanced_analytics
 from rest_framework.permissions import BasePermission
 
 
@@ -94,7 +97,36 @@ class FieldViewSet(viewsets.ModelViewSet):
         """Return fields as GeoJSON for map visualization"""
         fields = self.get_queryset()
         serializer = FieldGeoSerializer(fields, many=True)
-        return Response(serializer.data)
+        data = serializer.data
+        
+        # Inject is_assigned property for each feature
+        for feature in data.get('features', []):
+            feature['properties']['isAssigned'] = True # All fields in get_queryset are assigned or visible to user
+            
+            
+        return Response(data)
+
+    @action(detail=True, methods=['get'])
+    def indices(self, request, pk=None):
+        """
+        Simulate satellite indices calculation for a specific field.
+        In a real scenario, this would query a GIS service or Sentinel Hub.
+        """
+        # field = self.get_object() # Access field object if needed for location-based logic
+
+        # Simulated values representative of healthy vegetation
+        data = {
+            'NDVI': round(random.uniform(0.6, 0.85), 2),
+            'EVI': round(random.uniform(0.4, 0.6), 2),
+            'SAVI': round(random.uniform(0.3, 0.5), 2),
+            'NDWI': round(random.uniform(0.2, 0.4), 2),
+            'GNDVI': round(random.uniform(0.5, 0.75), 2),
+            'NDRE': round(random.uniform(0.3, 0.5), 2),
+            'LAI': round(random.uniform(2.5, 4.5), 1),
+            'VCI': round(random.uniform(60.0, 95.0), 1),
+        }
+        
+        return Response(data)
 
 
 class ObservationViewSet(viewsets.ModelViewSet):
@@ -161,6 +193,75 @@ class ObservationViewSet(viewsets.ModelViewSet):
         
         return Response(created_media, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """Export observations to CSV"""
+        observations = self.get_queryset().select_related('field', 'data_collector').prefetch_related('crop_management', 'crop_measurement')
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="observations_export.csv"'
+        
+        writer = csv.writer(response)
+        # Write Header
+        writer.writerow([
+            'observation_id', 'field_id', 'collector', 'observation_date',
+            'crop_variety', 'growth_stage', 'crop_height_cm', 'number_of_leaves',
+            'plant_population', 'vigor', 'canopy_cover_percentage', 'weed_pressure',
+            'soil_moisture', 'soil_moisture_level', 'weather', 'irrigation_applied',
+            'watering_progress', 'fertilizer_applied', 'fertilizer_type',
+            'fertilizer_amount', 'fertilizer_date', 'pest_present', 'pest_type',
+            'pest_severity', 'pest_percentage_affected', 'sprayed', 'pesticide_used',
+            'urgent_attention'
+        ])
+        
+        for obs in observations:
+            management = getattr(obs, 'crop_management', None)
+            measurement = getattr(obs, 'crop_measurement', None)
+            
+            writer.writerow([
+                obs.id,
+                obs.field.field_id if obs.field else '',
+                obs.data_collector_name or (obs.data_collector.username if obs.data_collector else ''),
+                obs.observation_date,
+                obs.crop_variety,
+                obs.growth_stage,
+                measurement.crop_height_cm if measurement else '',
+                measurement.number_of_leaves if measurement else '',
+                measurement.plant_population if measurement else '',
+                measurement.vigor if measurement else '',
+                measurement.canopy_cover_percentage if measurement else '',
+                measurement.weed_pressure if measurement else '',
+                measurement.soil_moisture if measurement else '',
+                measurement.soil_moisture_level if measurement else '',
+                management.weather if management else '',
+                management.irrigation_applied if management else '',
+                management.watering if management else '',
+                management.fertilizer_applied if management else '',
+                management.fertilizer_type if management else '',
+                management.fertilizer_amount if management else '',
+                management.fertilizer_date if management else '',
+                management.pest_present if management else '',
+                management.pest_type if management else '',
+                management.pest_severity if management else '',
+                management.pest_percentage_affected if management else '',
+                management.sprayed if management else '',
+                management.pesticide_used if management else '',
+                obs.urgent_attention
+            ])
+            
+        return response
+
+    @action(detail=False, methods=['get'])
+    def analytics_data(self, request):
+        """Dedicated analytics endpoint with deep data depth"""
+        observations = self.get_queryset().select_related(
+            'field', 'data_collector'
+        ).prefetch_related(
+            'crop_management', 'crop_measurement'
+        )
+        serializer = ObservationAnalyticsSerializer(observations, many=True)
+        return Response(serializer.data)
+
 
 class CropManagementViewSet(viewsets.ModelViewSet):
     queryset = CropManagement.objects.all()
@@ -195,15 +296,31 @@ class StatsViewSet(viewsets.ViewSet):
     def moisture_trends(self, request):
         """Get soil moisture trends"""
         days = int(request.query_params.get('days', 30))
-        trends = get_moisture_trends(user=request.user, days=days)
+        field_id = request.query_params.get('field_id', None)
+        trends = get_moisture_trends(user=request.user, days=days, field_id=field_id)
         return Response(trends)
     
     @action(detail=False, methods=['get'])
     def growth_analysis(self, request):
         """Get crop growth analysis"""
         crop_variety = request.query_params.get('crop_variety', None)
-        analysis = get_growth_analysis(crop_variety=crop_variety, user=request.user)
+        field_id = request.query_params.get('field_id', None)
+        analysis = get_growth_analysis(crop_variety=crop_variety, user=request.user, field_id=field_id)
         return Response(analysis)
+
+    @action(detail=False, methods=['get'])
+    def insights(self, request):
+        """Get automated insights and stories"""
+        days = int(request.query_params.get('days', 30))
+        insights = get_insights(user=request.user, days=days)
+        return Response(insights)
+
+    @action(detail=False, methods=['get'])
+    def advanced(self, request):
+        """Get advanced agricultural analytics"""
+        days = int(request.query_params.get('days', 30))
+        stats = get_advanced_analytics(user=request.user, days=days)
+        return Response(stats)
 
 
 class RegisterView(CreateAPIView):

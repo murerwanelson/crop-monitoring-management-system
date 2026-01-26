@@ -348,7 +348,7 @@ const Home = () => {
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>{desc}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1 }} />
-            <IconButton sx={{ bgcolor: 'rgba(0,0,0,0.03)', borderRadius: '10px' }}>
+            <IconButton sx={{ bgcolor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
                 <ArrowIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
             </IconButton>
         </Paper>
@@ -364,7 +364,7 @@ const Home = () => {
                 <Stack direction="row" spacing={2}>
                     <IconButton
                         onClick={handleOpenNotifications}
-                        sx={{ bgcolor: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 3, p: 1.5 }}
+                        sx={{ bgcolor: 'background.paper', boxShadow: theme.palette.mode === 'light' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none', borderRadius: 3, p: 1.5, border: theme.palette.mode === 'dark' ? '1px solid' : 'none', borderColor: 'divider' }}
                     >
                         <BellIcon sx={{ color: 'text.secondary' }} />
                     </IconButton>
@@ -468,9 +468,10 @@ const Home = () => {
                                 height: '100%',
                                 borderRadius: 5,
                                 position: 'relative',
-                                border: '1px solid rgba(0,0,0,0.05)',
+                                border: '1px solid',
+                                borderColor: 'divider',
                                 transition: 'all 0.3s',
-                                '&:hover': { bgcolor: 'white', boxShadow: '0 12px 24px -8px rgba(0,0,0,0.08)' }
+                                '&:hover': { bgcolor: 'background.paper', boxShadow: theme.palette.mode === 'light' ? '0 12px 24px -8px rgba(0,0,0,0.08)' : '0 12px 24px -8px rgba(0,0,0,0.5)' }
                             }} elevation={0}>
                                 <Typography variant="h4" sx={{
                                     fontWeight: 900,
