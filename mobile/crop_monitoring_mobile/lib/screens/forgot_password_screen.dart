@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/gradient_button.dart';
-import '../widgets/modern_text_field.dart';
+// import '../widgets/gradient_button.dart'; // Removed unused
+// import '../widgets/modern_text_field.dart'; // Removed unused
 import '../utils/app_colors.dart';
-import '../utils/app_animations.dart';
-import '../services/api_service.dart';
+// import '../utils/app_animations.dart'; // Removed unused
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'reset_password_screen.dart';
 import '../widgets/wave_clipper.dart';
 
@@ -32,12 +32,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
     _fadeAnimations = List.generate(
       4,
-      (index) => Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _animController,
-          curve: Interval(index * 0.1, 0.6 + (index * 0.1), curve: Curves.easeOut),
-        ),
-      ),
+      (index) {
+        final start = (index * 0.1).clamp(0.0, 1.0);
+        final end = (0.6 + (index * 0.1)).clamp(0.0, 1.0);
+        return Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _animController,
+            curve: Interval(start, end, curve: Curves.easeOut),
+          ),
+        );
+      },
     );
 
     _slideAnimations = List.generate(
@@ -72,27 +76,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     }
 
     setState(() => _isLoading = true);
-    final apiService = ApiService();
-    final success = await apiService.requestPasswordReset(emailController.text);
-    
-    if (mounted) {
-      setState(() => _isLoading = false);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResetPasswordScreen(email: emailController.text),
-        ),
-      );
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success 
-            ? 'If an account exists, a 6-digit code has been sent.' 
-            : 'Failed to request reset. Please try again later.'),
-          backgroundColor: success ? AppColors.successGreen : AppColors.errorRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(emailController.text);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResetPasswordScreen(email: emailController.text),
+          ),
+        );
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent. Please check your inbox.'),
+            backgroundColor: AppColors.successGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -217,7 +230,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFF1B5E20).withOpacity(0.1),
+          color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
           width: 1.2,
         ),
       ),

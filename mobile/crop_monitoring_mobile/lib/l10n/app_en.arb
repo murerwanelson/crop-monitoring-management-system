@@ -1,0 +1,22 @@
+{
+  "@@locale": "en",
+  "appName": "Crop Monitoring",
+  "welcomeBack": "Welcome back,",
+  "fieldOperations": "FIELD OPERATIONS",
+  "newObservation": "New Observation",
+  "captureRealTimeData": "Capture real-time field data",
+  "observationHistory": "Observation History",
+  "viewManageRecords": "View and manage local records",
+  "weatherReport": "WEATHER REPORT",
+  "dataHealth": "DATA HEALTH",
+  "cloudSynced": "CLOUD SYNCED",
+  "offlinePending": "OFFLINE PENDING",
+  "systemHealthy": "System Healthy",
+  "syncing": "Syncing...",
+  "login": "Login",
+  "register": "Register",
+  "email": "Email",
+  "password": "Password",
+  "forgotPassword": "Forgot Password?",
+  "resetPassword": "Reset Password"
+}

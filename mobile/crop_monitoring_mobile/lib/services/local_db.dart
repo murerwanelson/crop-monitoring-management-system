@@ -22,7 +22,7 @@ class LocalDB {
     String path = join(documentsDirectory.path, 'crop_monitoring.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (Database db, int version) async {
         await db.execute('''
           CREATE TABLE observations(
@@ -44,6 +44,13 @@ class LocalDB {
             data TEXT
           )
         ''');
+        await db.execute('''
+          CREATE TABLE blocks(
+            id TEXT PRIMARY KEY,
+            block_id TEXT UNIQUE,
+            data TEXT
+          )
+        ''');
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
@@ -59,6 +66,15 @@ class LocalDB {
           await db.execute('''
             CREATE TABLE drafts(
               key TEXT PRIMARY KEY,
+              data TEXT
+            )
+          ''');
+        }
+        if (oldVersion < 4) {
+          await db.execute('''
+            CREATE TABLE blocks(
+              id TEXT PRIMARY KEY,
+              block_id TEXT UNIQUE,
               data TEXT
             )
           ''');
@@ -96,13 +112,27 @@ class LocalDB {
   // Get unsynced observations
   Future<List<Map<String, dynamic>>> getUnsyncedObservations() async {
     final dbClient = await db;
+    // Order by ID desc (newest first for local processing)
     return await dbClient.query('observations', where: 'synced = 0');
+  }
+
+  // Get ALL observations (synced + unsynced)
+  Future<List<Map<String, dynamic>>> getAllObservations() async {
+    final dbClient = await db;
+    // Order by ID desc (newest first)
+    return await dbClient.query('observations', orderBy: 'id DESC');
   }
 
   // Get unsynced fields
   Future<List<Map<String, dynamic>>> getUnsyncedFields() async {
     final dbClient = await db;
     return await dbClient.query('fields', where: 'synced = 0');
+  }
+
+  // Get ALL fields
+  Future<List<Map<String, dynamic>>> getAllFields() async {
+    final dbClient = await db;
+    return await dbClient.query('fields', orderBy: 'id DESC');
   }
 
   // Get single observation by local ID
@@ -165,12 +195,60 @@ class LocalDB {
     );
   }
 
-  // Clear all data (observations, fields, drafts)
+  // Save multiple blocks at once
+  Future<void> syncBlocks(List<Map<String, dynamic>> blocks) async {
+    final dbClient = await db;
+    await dbClient.transaction((txn) async {
+      // Clear existing blocks for clean sync
+      await txn.delete('blocks');
+      for (var block in blocks) {
+        await txn.insert('blocks', {
+          'id': block['id'],
+          'block_id': block['block_id'],
+          'data': jsonEncode(block),
+        });
+      }
+    });
+  }
+
+  // Get all blocks
+  Future<List<Map<String, dynamic>>> getAllBlocks() async {
+    final dbClient = await db;
+    final results = await dbClient.query('blocks');
+    return results.map((e) => jsonDecode(e['data'] as String) as Map<String, dynamic>).toList();
+  }
+
+  // Clear all data (observations, fields, drafts, blocks) AND physical images
   Future<void> clearAllData() async {
     final dbClient = await db;
     await dbClient.delete('observations');
     await dbClient.delete('fields');
     await dbClient.delete('drafts');
+    await dbClient.delete('blocks');
+    await deleteAllImages();
+  }
+
+  Future<void> deleteAllImages() async {
+    try {
+      final cacheDir = await getTemporaryDirectory();
+      if (await cacheDir.exists()) {
+        final List<FileSystemEntity> files = cacheDir.listSync(recursive: true);
+        for (var file in files) {
+          if (file is File) {
+             final fileName = basename(file.path).toLowerCase();
+             if (fileName.contains('image_picker') || fileName.endsWith('.jpg') || fileName.endsWith('.png') || fileName.endsWith('.jpeg')) {
+               try {
+                 await file.delete();
+               } catch (e) {
+                 print('Failed to delete file ${file.path}: $e');
+               }
+             }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error deleting all images: $e');
+    }
   }
 
   // --- Statistics Helpers ---
@@ -223,6 +301,44 @@ class LocalDB {
     } catch (e) {
       print('Error calculating storage size: $e');
       return 0.0;
+    }
+  }
+
+  // --- Image Helpers ---
+
+  Future<List<File>> getLocalImages() async {
+    try {
+      final cacheDir = await getTemporaryDirectory();
+      List<File> imageFiles = [];
+      
+      if (await cacheDir.exists()) {
+        final List<FileSystemEntity> files = cacheDir.listSync(recursive: true);
+        for (var file in files) {
+          if (file is File) {
+            final fileName = basename(file.path).toLowerCase();
+            if (fileName.contains('image_picker') || fileName.endsWith('.jpg') || fileName.endsWith('.png') || fileName.endsWith('.jpeg')) {
+              imageFiles.add(file);
+            }
+          }
+        }
+      }
+      // Sort by date modified (newest first)
+      imageFiles.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+      return imageFiles;
+    } catch (e) {
+      print('Error getting local images: $e');
+      return [];
+    }
+  }
+
+  Future<void> deleteImage(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      print('Error deleting image: $e');
     }
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/gradient_button.dart';
-import '../widgets/modern_text_field.dart';
+// import '../widgets/gradient_button.dart'; // Removed unused
+// import '../widgets/modern_text_field.dart'; // Removed unused
 import '../utils/app_colors.dart';
-import '../utils/app_animations.dart';
-import '../services/api_service.dart';
+// import '../utils/app_animations.dart'; // Removed unused
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/wave_clipper.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -34,12 +34,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
 
     _fadeAnimations = List.generate(
       6,
-      (index) => Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _animController,
-          curve: Interval(index * 0.08, 0.5 + (index * 0.08), curve: Curves.easeOut),
-        ),
-      ),
+      (index) {
+        final start = (index * 0.08).clamp(0.0, 1.0);
+        final end = (0.5 + (index * 0.08)).clamp(0.0, 1.0);
+        return Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _animController,
+            curve: Interval(start, end, curve: Curves.easeOut),
+          ),
+        );
+      },
     );
 
     _slideAnimations = List.generate(
@@ -90,15 +94,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     }
 
     setState(() => _isLoading = true);
-    final apiService = ApiService();
-    final success = await apiService.resetPassword(
-      tokenController.text,
-      passwordController.text,
-    );
-    
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
+    try {
+      // Supabase OTP verification for password recovery
+      await Supabase.instance.client.auth.verifyOTP(
+        email: widget.email,
+        token: tokenController.text,
+        type: OtpType.recovery,
+      );
+      
+      // After verification, update the password
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: passwordController.text),
+      );
+      
+      // Force sign out to ensure a clean login with the new password
+      await Supabase.instance.client.auth.signOut();
+
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Password reset successfully! Please login.'),
@@ -107,10 +120,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
           ),
         );
         Navigator.popUntil(context, ModalRoute.withName('/login'));
-      } else {
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid or expired code. Please try again.'),
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: AppColors.errorRed,
             behavior: SnackBarBehavior.floating,
           ),
@@ -256,7 +272,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFF1B5E20).withOpacity(0.1),
+          color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
           width: 1.2,
         ),
       ),

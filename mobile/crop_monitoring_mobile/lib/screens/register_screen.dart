@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/app_state.dart';
+import '../providers/auth_provider.dart';
+import '../providers/sync_provider.dart';
 import '../utils/app_colors.dart';
-import '../utils/app_animations.dart';
-import '../widgets/gradient_button.dart';
+// import '../utils/app_animations.dart'; // Removed unused
+// import '../widgets/gradient_button.dart'; // Removed unused
 import '../widgets/modern_text_field.dart';
 import '../widgets/wave_clipper.dart';
 
@@ -16,10 +17,12 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
   late AnimationController _animController;
   late List<Animation<double>> _fadeAnimations;
   late List<Animation<Offset>> _slideAnimations;
@@ -35,33 +38,33 @@ class _RegisterScreenState extends State<RegisterScreen>
     // Create staggered animations for form elements
     _fadeAnimations = List.generate(
       7,
-      (index) => Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _animController,
-          curve: Interval(
-            index * 0.12,
-            0.5 + (index * 0.12),
-            curve: Curves.easeOut,
+      (index) {
+        final start = (index * 0.12).clamp(0.0, 1.0);
+        final end = (0.5 + (index * 0.12)).clamp(0.0, 1.0);
+        return Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _animController,
+            curve: Interval(start, end, curve: Curves.easeOut),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     _slideAnimations = List.generate(
       7,
-      (index) => Tween<Offset>(
-        begin: const Offset(0, 0.3),
-        end: Offset.zero,
-      ).animate(
-        CurvedAnimation(
-          parent: _animController,
-          curve: Interval(
-            index * 0.12,
-            0.5 + (index * 0.12),
-            curve: Curves.easeOutCubic,
+      (index) {
+        final start = (index * 0.12).clamp(0.0, 1.0);
+        final end = (0.5 + (index * 0.12)).clamp(0.0, 1.0);
+        return Tween<Offset>(
+          begin: const Offset(0, 0.3),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _animController,
+            curve: Interval(start, end, curve: Curves.easeOutCubic),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     _animController.forward();
@@ -70,9 +73,10 @@ class _RegisterScreenState extends State<RegisterScreen>
   @override
   void dispose() {
     _animController.dispose();
-    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     super.dispose();
   }
 
@@ -88,7 +92,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   void _register() async {
-    if (nameController.text.isEmpty || 
+    if (_firstNameController.text.isEmpty ||
+        _lastNameController.text.isEmpty ||
         emailController.text.isEmpty || 
         passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,20 +119,15 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     setState(() => _isLoading = true);
     
-    final appState = context.read<AppState>();
-    
-    final userData = {
-      'username': nameController.text.split(' ').join().toLowerCase() + 
-                 DateTime.now().millisecondsSinceEpoch.toString().substring(10),
-      'password': passwordController.text,
-      'email': emailController.text,
-      'first_name': nameController.text.split(' ').first,
-      'last_name': nameController.text.split(' ').length > 1 
-                   ? nameController.text.split(' ').skip(1).join(' ') 
-                   : '',
-    };
+    final authProvider = context.read<AuthProvider>();
+    final syncProvider = context.read<SyncProvider>();
 
-    final success = await appState.register(userData);
+    final success = await authProvider.register({
+      'email': emailController.text.trim(),
+      'password': passwordController.text.trim(),
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+    });
     
     if (mounted) {
       setState(() => _isLoading = false);
@@ -143,7 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration failed. Username or email already exists.'),
+            content: Text('Registration failed. Email might already be taken.'),
             backgroundColor: AppColors.errorRed,
             behavior: SnackBarBehavior.floating,
           ),
@@ -158,30 +158,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Upper tropical leaves with Wave Clip
-          ClipPath(
-            clipper: WaveClipper(),
-            child: Stack(
-              children: [
-                Container(
-                  height: MediaQuery.of(context).size.height * 0.4,
-                  decoration: const BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage('assets/images/tropical_leaves.png'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                Container(
-                  height: MediaQuery.of(context).size.height * 0.4,
-                  color: Colors.black.withValues(alpha: 0.1),
-                ),
-              ],
-            ),
-          ),
-          
-
-          // Main Content
+          // 1. Main Content (Moved to back so it scrolls under the image)
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -191,7 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                     SizedBox(height: MediaQuery.of(context).size.height * 0.35),
                     
                     // Header
-                    const Row(
+                    _buildAnimatedWidget(0, const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -227,25 +204,31 @@ class _RegisterScreenState extends State<RegisterScreen>
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     
                     const SizedBox(height: 40),
                     
                     // Form Fields
                     _buildAnimatedWidget(1, _buildInputField(
-                      controller: nameController,
-                      hint: 'Full Name',
+                      controller: _firstNameController,
+                      hint: 'First Name',
                       icon: Icons.person_outline_rounded,
                     )),
                     const SizedBox(height: 16),
                     _buildAnimatedWidget(2, _buildInputField(
+                      controller: _lastNameController,
+                      hint: 'Last Name',
+                      icon: Icons.person_outline_rounded,
+                    )),
+                    const SizedBox(height: 16),
+                    _buildAnimatedWidget(3, _buildInputField(
                       controller: emailController,
                       hint: 'Email Address',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                     )),
                     const SizedBox(height: 16),
-                    _buildAnimatedWidget(3, _buildInputField(
+                    _buildAnimatedWidget(4, _buildInputField(
                       controller: passwordController,
                       hint: 'Password',
                       icon: Icons.lock_outline_rounded,
@@ -318,6 +301,30 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
           ),
+
+          // 2. Upper tropical leaves (Moved to front with IgnorePointer)
+          IgnorePointer(
+            child: ClipPath(
+              clipper: WaveClipper(),
+              child: Stack(
+                children: [
+                  Container(
+                    height: MediaQuery.of(context).size.height * 0.4,
+                    decoration: const BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/tropical_leaves.png'),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    height: MediaQuery.of(context).size.height * 0.4,
+                    color: Colors.black.withValues(alpha: 0.1),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
       
@@ -363,20 +370,27 @@ class _RegisterScreenState extends State<RegisterScreen>
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFF1B5E20).withOpacity(0.1),
+          color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
           width: 1.2,
         ),
       ),
       child: TextField(
         controller: controller,
-        obscureText: isPassword,
+        obscureText: isPassword ? _obscurePassword : false,
         keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Color(0xFF757575), fontSize: 15),
           prefixIcon: Icon(icon, color: const Color(0xFF1B5E20), size: 22),
           suffixIcon: isPassword 
-            ? const Icon(Icons.visibility_outlined, color: Color(0xFF1B5E20), size: 20)
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: const Color(0xFF1B5E20),
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              )
             : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
