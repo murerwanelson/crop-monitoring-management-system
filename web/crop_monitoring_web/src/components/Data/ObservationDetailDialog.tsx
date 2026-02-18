@@ -23,7 +23,6 @@ import {
     Grass,
     Science,
     BugReport,
-    DateRange,
     Image as ImageIcon
 } from '@mui/icons-material';
 import { FullObservation } from '@/types/database.types';
@@ -63,7 +62,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
 
     if (!observation) return null;
 
-    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
@@ -128,7 +127,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                 {/* 1. Agronomy Overview */}
                 <CustomTabPanel value={tabValue} index={0}>
                     <Grid container spacing={4}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'primary.light' }}>Crop Profile</Typography>
                                 <InfoRow label="Crop Type" value={observation.crop_information?.crop_type} />
@@ -139,7 +138,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                                 <InfoRow label="Exp. Harvest" value={observation.crop_information?.expected_harvest_date} />
                             </Paper>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'warning.light' }}>Health & Monitoring</Typography>
                                 <InfoRow label="Canopy Cover" value={`${observation.crop_monitoring?.canopy_cover}%`} />
@@ -157,7 +156,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                 {/* 2. Inputs & Soil */}
                 <CustomTabPanel value={tabValue} index={1}>
                     <Grid container spacing={4}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2, mb: 3 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'info.light' }}>Irrigation Data</Typography>
                                 <InfoRow label="Soil Moisture" value={`${observation.irrigation_management?.soil_moisture_percentage}%`} icon={<WaterDrop fontSize="small" />} />
@@ -173,7 +172,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                                 <InfoRow label="Application Date" value={observation.nutrient_management?.application_date} />
                             </Paper>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'success.light' }}>Soil Characteristics</Typography>
                                 <InfoRow label="Soil Type" value={observation.soil_characteristics?.soil_type} icon={<Grass fontSize="small" />} />
@@ -189,7 +188,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                 {/* 3. Protection */}
                 <CustomTabPanel value={tabValue} index={2}>
                     <Grid container spacing={4}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2, mb: 3 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'error.light' }}>Pests & Diseases</Typography>
                                 <InfoRow label="Pest Detected" value={observation.crop_protection?.pest_type || 'None'} />
@@ -202,7 +201,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                                 <InfoRow label="Weed Level" value={observation.crop_protection?.weed_level} />
                             </Paper>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: 'info.light' }}>Control Measures</Typography>
                                 <Box sx={{ mb: 2 }}>
@@ -225,7 +224,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                 {/* 4. Media & Geo */}
                 <CustomTabPanel value={tabValue} index={3}>
                     <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Field Images</Typography>
                             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                 {observation.images?.length ? (
@@ -242,7 +241,7 @@ export const ObservationDetailDialog: React.FC<ObservationDetailDialogProps> = (
                                 )}
                             </Box>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="h6" fontWeight={700} gutterBottom>Geospatial Context</Typography>
                             <Box sx={{ height: 300, width: '100%', borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <MapContainer

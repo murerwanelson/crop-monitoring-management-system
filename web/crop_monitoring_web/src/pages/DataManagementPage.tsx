@@ -23,7 +23,7 @@ import { ObservationTable } from '@/components/Data/ObservationTable'
 import { ObservationDetailDialog } from '@/components/Data/ObservationDetailDialog'
 import { ObservationEditDialog } from '@/components/Data/ObservationEditDialog'
 import { exportToCSV, generatePDFReport } from '@/utils/exportUtils'
-import { updateObservation } from '@/services/database.service'
+import { updateObservation, deleteObservation } from '@/services/database.service'
 import { FilterBar } from '@/components/Dashboard/FilterBar'
 
 // Simple Error Boundary for debugging
@@ -77,7 +77,7 @@ export function DataManagementPage() {
 function DataManagementPageContent() {
     const theme = useTheme()
     const { user } = useAuth()
-    const { data: observations, isLoading, error, mutate } = useObservations()
+    const { data: observations, isLoading, error, refetch } = useObservations()
 
     // State
     const [page, setPage] = useState(0)
@@ -97,6 +97,7 @@ function DataManagementPageContent() {
     })
 
     const isAdmin = user?.role === 'admin'
+    console.log('Current user role:', user?.role, 'Is Admin:', isAdmin)
 
     // Filtering Logic
     const handleFilterChange = (name: string, value: any) => {
@@ -153,16 +154,23 @@ function DataManagementPageContent() {
     }
 
     const handleDelete = async (id: string) => {
+        console.log('Attempting to delete observation:', id)
         if (window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
-            // In a real app, call delete service here
-            console.log('Delete feature to be implemented securely', id)
+            try {
+                await deleteObservation(id) // Call the imported service
+                refetch() // Refresh the data list
+            } catch (err: any) {
+                console.error("Failed to delete observation:", err)
+                alert(`Failed to delete the record: ${err.message || 'Unknown error'}`)
+            }
         }
     }
 
     const handleSaveEdit = async (updatedObs: FullObservation) => {
         await updateObservation(updatedObs)
-        mutate() // Refresh data
+        refetch() // Refresh data
     }
+
 
     const handleChangePage = (_event: unknown, newPage: number) => {
         setPage(newPage)

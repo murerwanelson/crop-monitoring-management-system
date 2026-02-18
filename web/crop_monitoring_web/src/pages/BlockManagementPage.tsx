@@ -286,7 +286,7 @@ export function BlockManagementPage() {
                         position: 'relative',
                         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                         border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 6,
+                        borderRadius: 3,
                         bgcolor: '#0f172a'
                     }}>
                         {!geoJson ? (

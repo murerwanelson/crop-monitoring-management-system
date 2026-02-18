@@ -118,7 +118,15 @@ export function DashboardPage() {
     }, [filteredObservations])
 
     const stats = useMemo(() => {
-        if (!filteredObservations.length) return null
+        if (!filteredObservations.length) {
+            return {
+                avgMoisture: '0.0',
+                avgCanopy: '0.0',
+                total: 0,
+                healthStatus: 'NO DATA',
+                healthColor: 'text.disabled'
+            }
+        }
         const avgMoisture = filteredObservations.reduce((acc, curr) => acc + (curr.irrigation_management?.soil_moisture_percentage || 0), 0) / filteredObservations.length
         const avgCanopy = filteredObservations.reduce((acc, curr) => acc + (curr.crop_monitoring?.canopy_cover || 0), 0) / filteredObservations.length
 

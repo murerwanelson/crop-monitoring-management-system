@@ -51,7 +51,11 @@ export async function fetchObservations(filters?: ObservationFilters): Promise<F
     const { data, error } = await query
 
     if (error) {
-        console.error('Error fetching observations:', error)
+        console.error('--- fetchObservations Failed ---')
+        console.error('Error Details:', error)
+        if (error.message?.includes('fetch')) {
+            console.error('Potential Network Error detected in database service.')
+        }
         throw error
     }
 
@@ -93,10 +97,35 @@ export async function fetchObservationById(id: string): Promise<FullObservation 
  * Cascades to related tables via database constraints
  */
 export async function deleteObservation(id: string): Promise<void> {
-    const { error } = await supabase
+    // Explicitly delete related records first to handle cases where ON DELETE CASCADE might be missing
+    const tables = [
+        'crop_information',
+        'crop_monitoring',
+        'soil_characteristics',
+        'irrigation_management',
+        'nutrient_management',
+        'crop_protection',
+        'control_methods',
+        'harvest',
+        'residual_management',
+        'images' // Assuming images metadata table is linked
+    ]
+
+    // We use Promise.all to delete parallel, but we need to handle them carefully.
+    // Actually, simple sequential or parallel delete is fine.
+    const deletePromises = tables.map(table =>
+        supabase.from(table).delete().eq('observation_id', id)
+    )
+
+    await Promise.all(deletePromises)
+
+    // Now delete the parent observation
+    const { error, count } = await supabase
         .from('observations')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('id', id)
+
+    console.log('Delete operation result:', { id, error, count })
 
     if (error) {
         console.error('Error deleting observation:', error)
@@ -215,8 +244,7 @@ export async function updateObservation(observation: FullObservation): Promise<v
         promises.push(
             supabase
                 .from('crop_information')
-                .update(updates.crop_information)
-                .eq('observation_id', id)
+                .upsert({ ...updates.crop_information, observation_id: id })
         )
     }
 
@@ -224,8 +252,7 @@ export async function updateObservation(observation: FullObservation): Promise<v
         promises.push(
             supabase
                 .from('crop_monitoring')
-                .update(updates.crop_monitoring)
-                .eq('observation_id', id)
+                .upsert({ ...updates.crop_monitoring, observation_id: id })
         )
     }
 
@@ -233,8 +260,7 @@ export async function updateObservation(observation: FullObservation): Promise<v
         promises.push(
             supabase
                 .from('irrigation_management')
-                .update(updates.irrigation_management)
-                .eq('observation_id', id)
+                .upsert({ ...updates.irrigation_management, observation_id: id })
         )
     }
 
@@ -242,8 +268,47 @@ export async function updateObservation(observation: FullObservation): Promise<v
         promises.push(
             supabase
                 .from('nutrient_management')
-                .update(updates.nutrient_management)
-                .eq('observation_id', id)
+                .upsert({ ...updates.nutrient_management, observation_id: id })
+        )
+    }
+
+    if (updates.soil_characteristics) {
+        promises.push(
+            supabase
+                .from('soil_characteristics')
+                .upsert({ ...updates.soil_characteristics, observation_id: id })
+        )
+    }
+
+    if (updates.crop_protection) {
+        promises.push(
+            supabase
+                .from('crop_protection')
+                .upsert({ ...updates.crop_protection, observation_id: id })
+        )
+    }
+
+    if (updates.control_methods) {
+        promises.push(
+            supabase
+                .from('control_methods')
+                .upsert({ ...updates.control_methods, observation_id: id })
+        )
+    }
+
+    if (updates.harvest) {
+        promises.push(
+            supabase
+                .from('harvest')
+                .upsert({ ...updates.harvest, observation_id: id })
+        )
+    }
+
+    if (updates.residual_management) {
+        promises.push(
+            supabase
+                .from('residual_management')
+                .upsert({ ...updates.residual_management, observation_id: id })
         )
     }
 

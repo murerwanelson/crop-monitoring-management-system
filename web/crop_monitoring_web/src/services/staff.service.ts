@@ -98,7 +98,21 @@ export async function updateUserStatus(
     role: string,
     status: 'approved' | 'rejected'
 ) {
-    // 1. Update the profile record in public schema
+    // 1. If status is rejected, DELETE the profile
+    if (status === 'rejected') {
+        const { error: deleteError } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', userId)
+
+        if (deleteError) throw deleteError
+
+        // Notification
+        await emailService.sendRejectionNotification(email)
+        return { success: true }
+    }
+
+    // 2. Otherwise UPDATE the profile
     const { error: profileError } = await supabase
         .from('profiles')
         .update({ status })
@@ -106,15 +120,9 @@ export async function updateUserStatus(
 
     if (profileError) throw profileError
 
-    // 2. Update user metadata in Auth schema so login logic sees it immediately
-    // Note: This usually requires a service role key or an edge function
-    // For this demo, we assume profile status is the source of truth used in AuthContext
-
-    // 3. Send notification email to the user
+    // 3. Send notification email
     if (status === 'approved') {
         await emailService.sendApprovalNotification(email, role)
-    } else {
-        await emailService.sendRejectionNotification(email)
     }
 
     return { success: true }

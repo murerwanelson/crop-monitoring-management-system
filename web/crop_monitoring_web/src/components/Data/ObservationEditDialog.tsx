@@ -9,7 +9,6 @@ import {
     Grid,
     MenuItem,
     Typography,
-    Box,
     Alert
 } from '@mui/material';
 import { FullObservation } from '@/types/database.types';
@@ -179,8 +178,81 @@ export const ObservationEditDialog: React.FC<ObservationEditDialogProps> = ({
                     </Grid>
                 </Grid>
 
-                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>INPUTS (OPTIONAL)</Typography>
-                <Grid container spacing={2}>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>SOIL CHARACTERISTICS</Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Soil Type"
+                            value={formData.soil_characteristics?.soil_type || ''}
+                            onChange={(e) => handleChange('soil_characteristics', 'soil_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Texture"
+                            value={formData.soil_characteristics?.soil_texture || ''}
+                            onChange={(e) => handleChange('soil_characteristics', 'soil_texture', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="number"
+                            fullWidth
+                            label="pH Level"
+                            value={formData.soil_characteristics?.soil_ph || ''}
+                            onChange={(e) => handleChange('soil_characteristics', 'soil_ph', parseFloat(e.target.value))}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="number"
+                            fullWidth
+                            label="Organic Matter (%)"
+                            value={formData.soil_characteristics?.organic_matter || ''}
+                            onChange={(e) => handleChange('soil_characteristics', 'organic_matter', parseFloat(e.target.value))}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Drainage Class"
+                            value={formData.soil_characteristics?.drainage_class || ''}
+                            onChange={(e) => handleChange('soil_characteristics', 'drainage_class', e.target.value)}
+                        />
+                    </Grid>
+                </Grid>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>IRRIGATION MANAGEMENT</Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Irrigation Type"
+                            value={formData.irrigation_management?.irrigation_type || ''}
+                            onChange={(e) => handleChange('irrigation_management', 'irrigation_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="date"
+                            fullWidth
+                            label="Date"
+                            InputLabelProps={{ shrink: true }}
+                            value={formData.irrigation_management?.irrigation_date || ''}
+                            onChange={(e) => handleChange('irrigation_management', 'irrigation_date', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="number"
+                            fullWidth
+                            label="Volume (L)"
+                            value={formData.irrigation_management?.irrigation_volume || ''}
+                            onChange={(e) => handleChange('irrigation_management', 'irrigation_volume', parseFloat(e.target.value))}
+                        />
+                    </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                         <TextField
                             type="number"
@@ -193,9 +265,200 @@ export const ObservationEditDialog: React.FC<ObservationEditDialogProps> = ({
                     <Grid size={{ xs: 12, md: 6 }}>
                         <TextField
                             fullWidth
+                            label="Water Source"
+                            value={formData.irrigation_management?.water_source || ''}
+                            onChange={(e) => handleChange('irrigation_management', 'water_source', e.target.value)}
+                        />
+                    </Grid>
+                </Grid>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>NUTRIENT MANAGEMENT</Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
                             label="Fertilizer Type"
                             value={formData.nutrient_management?.fertilizer_type || ''}
                             onChange={(e) => handleChange('nutrient_management', 'fertilizer_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            type="date"
+                            fullWidth
+                            label="Application Date"
+                            InputLabelProps={{ shrink: true }}
+                            value={formData.nutrient_management?.application_date || ''}
+                            onChange={(e) => handleChange('nutrient_management', 'application_date', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            type="number"
+                            fullWidth
+                            label="Application Rate (kg/ha)"
+                            value={formData.nutrient_management?.application_rate || ''}
+                            onChange={(e) => handleChange('nutrient_management', 'application_rate', parseFloat(e.target.value))}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="NPK Ratio"
+                            value={formData.nutrient_management?.npk_ratio || ''}
+                            onChange={(e) => handleChange('nutrient_management', 'npk_ratio', e.target.value)}
+                        />
+                    </Grid>
+                </Grid>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>CROP PROTECTION</Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Weed Type"
+                            value={formData.crop_protection?.weed_type || ''}
+                            onChange={(e) => handleChange('crop_protection', 'weed_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="Weed Level"
+                            value={formData.crop_protection?.weed_level || ''}
+                            onChange={(e) => handleChange('crop_protection', 'weed_level', e.target.value)}
+                        >
+                            {['None', 'Low', 'Medium', 'High'].map((opt) => (
+                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Pest Type"
+                            value={formData.crop_protection?.pest_type || ''}
+                            onChange={(e) => handleChange('crop_protection', 'pest_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="Pest Severity"
+                            value={formData.crop_protection?.pest_severity || ''}
+                            onChange={(e) => handleChange('crop_protection', 'pest_severity', e.target.value)}
+                        >
+                            {['None', 'Low', 'Medium', 'High'].map((opt) => (
+                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Disease Type"
+                            value={formData.crop_protection?.disease_type || ''}
+                            onChange={(e) => handleChange('crop_protection', 'disease_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="Disease Severity"
+                            value={formData.crop_protection?.disease_severity || ''}
+                            onChange={(e) => handleChange('crop_protection', 'disease_severity', e.target.value)}
+                        >
+                            {['None', 'Low', 'Medium', 'High'].map((opt) => (
+                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 12 }}>
+                        <TextField
+                            fullWidth
+                            label="Remarks"
+                            multiline
+                            rows={2}
+                            value={formData.crop_protection?.remarks || ''}
+                            onChange={(e) => handleChange('crop_protection', 'remarks', e.target.value)}
+                        />
+                    </Grid>
+                </Grid>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>CONTROL METHODS</Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Weed Control"
+                            value={formData.control_methods?.weed_control || ''}
+                            onChange={(e) => handleChange('control_methods', 'weed_control', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Pest Control"
+                            value={formData.control_methods?.pest_control || ''}
+                            onChange={(e) => handleChange('control_methods', 'pest_control', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Disease Control"
+                            value={formData.control_methods?.disease_control || ''}
+                            onChange={(e) => handleChange('control_methods', 'disease_control', e.target.value)}
+                        />
+                    </Grid>
+                </Grid>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 700 }}>HARVEST & RESIDUALS</Typography>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="date"
+                            fullWidth
+                            label="Harvest Date"
+                            InputLabelProps={{ shrink: true }}
+                            value={formData.harvest?.harvest_date || ''}
+                            onChange={(e) => handleChange('harvest', 'harvest_date', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            type="number"
+                            fullWidth
+                            label="Yield (tons/ha)"
+                            value={formData.harvest?.yield || ''}
+                            onChange={(e) => handleChange('harvest', 'yield', parseFloat(e.target.value))}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                            fullWidth
+                            label="Harvest Method"
+                            value={formData.harvest?.harvest_method || ''}
+                            onChange={(e) => handleChange('harvest', 'harvest_method', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Residue Type"
+                            value={formData.residual_management?.residue_type || ''}
+                            onChange={(e) => handleChange('residual_management', 'residue_type', e.target.value)}
+                        />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Management Method"
+                            value={formData.residual_management?.management_method || ''}
+                            onChange={(e) => handleChange('residual_management', 'management_method', e.target.value)}
                         />
                     </Grid>
                 </Grid>

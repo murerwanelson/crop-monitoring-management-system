@@ -20,8 +20,7 @@ import {
 import {
     Visibility,
     Edit,
-    Delete,
-    Warning
+    Delete
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { FullObservation } from '@/types/database.types';
@@ -171,7 +170,14 @@ export const ObservationTable: React.FC<ObservationTableProps> = ({
                                     </Tooltip>
                                     {isAdmin && (
                                         <Tooltip title="Delete Record">
-                                            <IconButton size="small" onClick={() => onDelete(obs.id)} color="error">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                    console.log('Delete icon clicked for:', obs.id);
+                                                    onDelete(obs.id);
+                                                }}
+                                                color="error"
+                                            >
                                                 <Delete fontSize="small" />
                                             </IconButton>
                                         </Tooltip>

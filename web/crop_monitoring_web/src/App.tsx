@@ -15,8 +15,10 @@ const MapViewPage = lazy(() => import('@/pages/MapViewPage').then(m => ({ defaul
 const DataManagementPage = lazy(() => import('@/pages/DataManagementPage').then(m => ({ default: m.DataManagementPage })))
 const DataDemoPage = lazy(() => import('@/pages/DataDemoPage').then(m => ({ default: m.DataDemoPage })))
 const SignUpPage = lazy(() => import('@/pages/SignUpPage').then(m => ({ default: m.SignUpPage })))
-const PendingApprovalsPage = lazy(() => import('@/pages/PendingApprovalsPage').then(m => ({ default: m.PendingApprovalsPage })))
+const SecurityCenterPage = lazy(() => import('@/pages/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })))
 const BlockManagementPage = lazy(() => import('@/pages/BlockManagementPage').then(m => ({ default: m.BlockManagementPage })))
+const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
+const UpdatePasswordPage = lazy(() => import('@/pages/UpdatePasswordPage').then(m => ({ default: m.UpdatePasswordPage })))
 
 // Create a client
 const queryClient = new QueryClient({
@@ -53,6 +55,8 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignUpPage />} />
+              <Route path="/forgot-password" element={<Suspense fallback={<LoadingFallback />}><ForgotPasswordPage /></Suspense>} />
+              <Route path="/update-password" element={<Suspense fallback={<LoadingFallback />}><UpdatePasswordPage /></Suspense>} />
 
               <Route
                 path="/"
@@ -96,10 +100,10 @@ function App() {
                   }
                 />
                 <Route
-                  path="pending-approvals"
+                  path="security"
                   element={
                     <Suspense fallback={<LoadingFallback />}>
-                      <PendingApprovalsPage />
+                      <SecurityCenterPage />
                     </Suspense>
                   }
                 />

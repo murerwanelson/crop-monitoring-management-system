@@ -6,6 +6,8 @@ import { User } from '@supabase/supabase-js'
 interface AuthContextType extends AuthState {
     signIn: (credentials: LoginCredentials) => Promise<void>
     signOut: () => Promise<void>
+    resetPassword: (email: string) => Promise<void>
+    updatePassword: (password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -143,10 +145,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
     }
 
+    const resetPassword = async (email: string) => {
+        // The URL to redirect to after user clicks the link in email
+        // Ideally this should be an env var, but for now we'll assume the same host
+        const redirectTo = `${window.location.origin}/update-password`
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo,
+        })
+        if (error) throw error
+    }
+
+    const updatePassword = async (password: string) => {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+    }
+
     const value: AuthContextType = {
         ...authState,
         signIn,
         signOut,
+        resetPassword,
+        updatePassword,
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

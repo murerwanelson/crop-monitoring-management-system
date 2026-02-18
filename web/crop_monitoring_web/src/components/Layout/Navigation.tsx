@@ -154,12 +154,12 @@ export function Navigation() {
                     {user?.role === 'admin' && (
                         <ListItem disablePadding sx={{ mb: 1 }}>
                             <ListItemButton
-                                onClick={() => navigate('/pending-approvals')}
+                                onClick={() => navigate('/security')}
                                 sx={{
                                     borderRadius: 3,
                                     py: 1.5,
-                                    bgcolor: location.pathname === '/pending-approvals' ? alpha(theme.palette.primary.light, 0.1) : 'transparent',
-                                    color: location.pathname === '/pending-approvals' ? 'primary.light' : 'text.secondary',
+                                    bgcolor: location.pathname === '/security' ? alpha(theme.palette.primary.light, 0.1) : 'transparent',
+                                    color: location.pathname === '/security' ? 'primary.light' : 'text.secondary',
                                     '&:hover': { bgcolor: alpha(theme.palette.primary.light, 0.05), color: 'white' },
                                 }}
                             >
