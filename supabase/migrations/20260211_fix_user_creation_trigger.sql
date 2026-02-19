@@ -34,7 +34,11 @@ returns trigger as $$
 declare
     v_role text;
 begin
-    v_role := new.raw_user_meta_data->>'role';
+    -- Prefer raw_app_meta_data (Admin set) over raw_user_meta_data (User set)
+    v_role := coalesce(
+        new.raw_app_meta_data->>'role', 
+        new.raw_user_meta_data->>'role'
+    );
     
     -- Default role to 'supervisor' if missing/null to avoid NOT NULL constraint violations
     if v_role is null then

@@ -51,6 +51,10 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  Stream<List<Map<String, dynamic>>> getBlocksStream() {
+    return client.from('blocks').stream(primaryKey: ['id']).map((data) => List<Map<String, dynamic>>.from(data));
+  }
+
   // --- Storage ---
 
   Future<File> compressImage(File file) async {

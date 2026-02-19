@@ -13,8 +13,10 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 function getUserRole(user: User): AuthUser['role'] {
-    // Check user_metadata for role
-    const role = user.user_metadata?.role || user.app_metadata?.role
+    // CRITICAL: Check app_metadata FIRST. 
+    // This is where admin-assigned roles from the Supabase Dashboard reside.
+    // user_metadata contains signup-provided data which should be overwritten by admin assignment.
+    const role = user.app_metadata?.role || user.user_metadata?.role
 
     if (role === 'admin' || role === 'supervisor' || role === 'collector') {
         return role as AuthUser['role']

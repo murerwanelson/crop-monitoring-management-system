@@ -7,12 +7,14 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/observations_list_screen.dart';
+import 'screens/boundary_list_screen.dart';
 import 'screens/observation_form_screen.dart';
 import 'screens/observation_detail_screen.dart';
 // import 'screens/field_form_screen.dart'; // Deleted
 import 'screens/about_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/weather_detail_screen.dart';
+import 'screens/boundary_map_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/weather_provider.dart';
@@ -102,11 +104,13 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/home': (context) => const ObservationsListScreen(),
+        '/boundaries': (context) => const BoundaryListScreen(),
         '/add-observation': (context) => const ObservationFormScreen(),
         // '/add-field': (context) => const FieldFormScreen(), // Unified into observation form
         '/about': (context) => const AboutScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/weather-detail': (context) => const WeatherDetailScreen(),
+        '/boundary-map': (context) => const BoundaryMapScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/observation-detail') {

@@ -1,5 +1,7 @@
 // import 'dart:convert'; // Removed unused import
 import 'dart:io';
+import 'dart:async';
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -38,10 +40,9 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
   Position? _currentPosition;
   DateTime _dateRecorded = DateTime.now();
 
-  List<BlockModel> _availableBlocks = [];
   BlockModel? _selectedBlock;
-  bool _isLoadingBlocks = true;
   bool _isInsideBlock = false; // For validation status highlight
+
 
   /* ================= SECTION B: CROP INFO ================= */
   final _cropTypeCtrl = TextEditingController();
@@ -110,29 +111,43 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
   Future<void> _initializeApp() async {
     await _loadDraft();
-    await _fetchBlocks();
     await _getLocation();
     _checkBlockProximity();
   }
 
-  Future<void> _fetchBlocks() async {
-    try {
-      final blocksData = await _localDb.getAllBlocks();
-      setState(() {
-        _availableBlocks = blocksData.map((e) => BlockModel.fromMap(e)).toList();
-        _isLoadingBlocks = false;
-        
-        // Match selected block if blockIdCtrl already has a value from draft
-        if (_blockIdCtrl.text.isNotEmpty) {
-          try {
-            _selectedBlock = _availableBlocks.firstWhere((b) => b.blockId == _blockIdCtrl.text);
-          } catch (_) {}
-        }
-      });
-    } catch (e) {
-      debugPrint('Error fetching blocks: $e');
-      setState(() => _isLoadingBlocks = false);
-    }
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _sectionNameCtrl.dispose();
+    _blockIdCtrl.dispose();
+    _fieldNameCtrl.dispose();
+    _cropTypeCtrl.dispose();
+    _ratoonNumberCtrl.dispose();
+    _varietyCtrl.dispose();
+    _canopyCoverCtrl.dispose();
+    _monitoringRemarksCtrl.dispose();
+    _soilTypeCtrl.dispose();
+    _soilTextureCtrl.dispose();
+    _soilPhCtrl.dispose();
+    _organicMatterCtrl.dispose();
+    _drainageClassCtrl.dispose();
+    _irrigationTypeCtrl.dispose();
+    _irrigationVolumeCtrl.dispose();
+    _soilMoisturePctCtrl.dispose();
+    _waterSourceTypeCtrl.dispose();
+    _fertilizerTypeCtrl.dispose();
+    _applicationRateCtrl.dispose();
+    _macronutrientNpkCtrl.dispose();
+    _weedTypeCtrl.dispose();
+    _pestTypeCtrl.dispose();
+    _diseaseTypeCtrl.dispose();
+    _protectionRemarksCtrl.dispose();
+    _weedControlCtrl.dispose();
+    _pestControlCtrl.dispose();
+    _diseaseControlCtrl.dispose();
+    _yieldCtrl.dispose();
+    _residualOutcomeCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _getLocation() async {
@@ -554,8 +569,30 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // final syncProvider = context.watch<SyncProvider>();
+    final syncProvider = context.watch<SyncProvider>();
+    final availableBlocks = syncProvider.availableBlocks;
     context.watch<UIProvider>();
+
+    // Update _selectedBlock based on availableBlocks
+    if (_blockIdCtrl.text.isNotEmpty) {
+      try {
+        _selectedBlock = availableBlocks.firstWhere((b) => b.blockId == _blockIdCtrl.text);
+      } catch (_) {
+        _selectedBlock = null;
+      }
+    }
+
+    // Determine proximity locally for UI
+    bool isInside = false;
+    if (_currentPosition != null && _selectedBlock != null && _selectedBlock!.geom != null) {
+      try {
+        isInside = GeoUtils.isPointInPolygon(
+          _currentPosition!.latitude, 
+          _currentPosition!.longitude, 
+          _selectedBlock!.geom
+        );
+      } catch (_) {}
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
@@ -643,7 +680,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                   icon: Icons.map_outlined,
                   required: true,
                 ),
-                _isLoadingBlocks 
+                availableBlocks.isEmpty && syncProvider.isSyncing
                   ? const Padding(
                       padding: EdgeInsets.only(bottom: 20),
                       child: LinearProgressIndicator(color: Color(0xFF2E7D32)),
@@ -651,14 +688,14 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                   : _buildStyledBlockDropdown(
                       label: 'Block ID',
                       icon: Icons.grid_view_rounded,
-                      options: _availableBlocks,
+                      options: availableBlocks,
                       current: _selectedBlock,
                       required: true,
                       onChanged: (v) {
                         setState(() {
                           _selectedBlock = v;
                           _blockIdCtrl.text = v?.blockId ?? '';
-                          _checkBlockProximity();
+                          // Proximity will be recalculated in next build
                         });
                         _saveDraft();
                       },
@@ -689,16 +726,16 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _currentPosition == null ? 'Acquiring GPS...' : (_selectedBlock == null ? 'Location Captured' : (_isInsideBlock ? 'Validated Inside Block' : 'Outside Block Boundary')),
+                                  _currentPosition == null ? 'Acquiring GPS...' : (_selectedBlock == null ? 'Location Captured' : (isInside ? 'Validated Inside Block' : 'Outside Block Boundary')),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold, 
-                                    color: _currentPosition == null ? const Color(0xFF757575) : (_selectedBlock != null && !_isInsideBlock ? Colors.red : const Color(0xFF2E7D32))
+                                    color: _currentPosition == null ? const Color(0xFF757575) : (_selectedBlock != null && !isInside ? Colors.red : const Color(0xFF2E7D32))
                                   ),
                                 ),
                                 if (_currentPosition != null)
                                   Text(
-                                    'Acc: ${_currentPosition!.accuracy.toStringAsFixed(1)}m | ${_isInsideBlock ? "Verified Positioning" : "Accuracy Check Required"}',
-                                    style: TextStyle(fontSize: 12, color: _isInsideBlock ? const Color(0xFF757575) : Colors.red),
+                                    'Acc: ${_currentPosition!.accuracy.toStringAsFixed(1)}m | ${isInside ? "Verified Positioning" : "Accuracy Check Required"}',
+                                    style: TextStyle(fontSize: 12, color: isInside ? const Color(0xFF757575) : Colors.red),
                                   ),
                               ],
                             ),
@@ -1181,7 +1218,7 @@ class _ObservationFormScreenState extends State<ObservationFormScreen> {
                 ),
                 items: options.map((b) => DropdownMenuItem(
                   value: b, 
-                  child: Text("${b.blockId}${b.name != null ? ' - ${b.name}' : ''}", style: const TextStyle(fontSize: 14))
+                  child: Text(b.blockId, style: const TextStyle(fontSize: 14))
                 )).toList(),
                 onChanged: onChanged,
                 validator: required ? (v) => v == null ? 'Required' : null : null,

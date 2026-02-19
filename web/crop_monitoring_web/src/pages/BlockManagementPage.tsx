@@ -121,25 +121,43 @@ export function BlockManagementPage() {
             // or we can use a raw string for complex geometries.
             // For simple cases, Supabase handles GeoJSON directly if the column is geography/geometry
 
-            // Package geometry: If multiple features, wrap as MultiPolygon
-            let finalGeom = geoJson.features[0].geometry
-            if (geoJson.features.length > 1) {
-                // Collect all polygons/multipolygons
-                const allPolygons: any[] = []
+            // Package geometry: Ensure we ALWAYS send a MultiPolygon to match the database schema
+            let finalGeom: any = null;
+
+            if (geoJson.features.length > 0) {
+                const allPolygons: any[] = [];
                 geoJson.features.forEach((f: any) => {
                     if (f.geometry.type === 'Polygon') {
-                        allPolygons.push(f.geometry.coordinates)
+                        allPolygons.push(f.geometry.coordinates);
                     } else if (f.geometry.type === 'MultiPolygon') {
-                        allPolygons.push(...f.geometry.coordinates)
+                        allPolygons.push(...f.geometry.coordinates);
                     }
-                })
+                });
+
+                if (allPolygons.length === 0) {
+                    throw new Error('No valid Polygon features found in the uploaded file.');
+                }
+
                 finalGeom = {
                     type: 'MultiPolygon',
                     coordinates: allPolygons
-                }
+                };
+            } else {
+                throw new Error('No features detected in the Geospatial data.');
             }
 
-            const { error } = await supabase
+            // Clean 3D Coordinates (remove Z-index if present)
+            const stripZCoordinates = (coords: any[]): any[] => {
+                if (typeof coords[0] === 'number') {
+                    // It's a point [x, y, z?]
+                    return coords.slice(0, 2)
+                }
+                return coords.map(stripZCoordinates)
+            }
+
+            finalGeom.coordinates = stripZCoordinates(finalGeom.coordinates)
+
+            const { error: insertError } = await supabase
                 .from('blocks')
                 .insert({
                     block_id: blockId.trim(),
@@ -147,7 +165,17 @@ export function BlockManagementPage() {
                     created_by: user?.id,
                 })
 
-            if (error) throw error
+            if (insertError) {
+                console.error('Supabase Insert Error Details:', insertError);
+                // Specifically handle RLS or type mismatch errors
+                if (insertError.code === '42804') {
+                    throw new Error('Geometry type mismatch. Ensure the shapefile contains Polygons.');
+                }
+                if (insertError.code === '42501') {
+                    throw new Error('Permission Denied. You must be an Admin or Supervisor to upload blocks.');
+                }
+                throw new Error(insertError.message || 'Unknown database error occurred.');
+            }
 
             setStatus({ type: 'success', message: `Block ${blockId} successfully synchronized with GIS database.` })
             setFile(null)

@@ -204,6 +204,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       gradient: const [Color(0xFF558B2F), Color(0xFF33691E)],
                     ),
 
+                    _DashboardCard(
+                      icon: Icons.map_rounded,
+                      title: 'Boundaries',
+                      subtitle: 'View map boundaries',
+                      onTap: () => Navigator.pushNamed(context, '/boundaries'),
+                      gradient: const [Color(0xFF00695C), Color(0xFF004D40)],
+                    ),
+
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -220,12 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _HeaderAction(
-          icon: isFieldMode ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-          onTap: () => uiProvider.toggleFieldMode(),
-          backgroundColor: isFieldMode ? Colors.orange.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.15),
-          iconColor: isFieldMode ? Colors.orange : Colors.white,
-        ),
+
         
         // Data Health Indicator (The "Radar" pulse)
         Container(
@@ -276,9 +279,10 @@ class _WeatherWidget extends StatelessWidget {
   const _WeatherWidget({required this.weatherProvider, required this.uiProvider});
 
   @override
+  @override
   Widget build(BuildContext context) {
     if (weatherProvider.isWeatherLoading && weatherProvider.temperature == 0) {
-      return ShimmerLoading.card(width: 170, height: 140);
+      return ShimmerLoading.card(width: 155, height: 130);
     }
     
     final condition = weatherProvider.weatherCondition;
@@ -286,8 +290,8 @@ class _WeatherWidget extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     
     return Container(
-      width: 170,
-      padding: const EdgeInsets.all(16),
+      width: 155,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -306,27 +310,28 @@ class _WeatherWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(_getWeatherIcon(condition), color: _getWeatherColor(condition), size: 28),
+              Icon(_getWeatherIcon(condition), color: _getWeatherColor(condition), size: 24),
               Text(
                 '${weatherProvider.temperature.toInt()}°C',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(l10n.weatherReport, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5)),
           const SizedBox(height: 4),
-          Text(condition, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(condition, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
           Row(
             children: [
               const Icon(Icons.umbrella_rounded, size: 12, color: Colors.blue),
               const SizedBox(width: 4),
-              Text('${weatherProvider.rainfallChance.toInt()}%', style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 4),
+              Text('${weatherProvider.rainfallChance.toInt()}%', style: const TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w600)),
               const SizedBox(width: 8),
               const Icon(Icons.water_drop_rounded, size: 12, color: Colors.cyan),
               const SizedBox(width: 4),
-              Text('${weatherProvider.humidity.toInt()}%', style: const TextStyle(fontSize: 11, color: Colors.cyan, fontWeight: FontWeight.w600)),
+              Text('${weatherProvider.humidity.toInt()}%', style: const TextStyle(fontSize: 10, color: Colors.cyan, fontWeight: FontWeight.w600)),
             ],
           ),
         ],
@@ -370,9 +375,10 @@ class _SyncRadarWidget extends StatelessWidget {
   const _SyncRadarWidget({required this.syncProvider, required this.uiProvider});
 
   @override
+  @override
   Widget build(BuildContext context) {
     if (syncProvider.isSyncing && syncProvider.totalRecords == 0) {
-      return ShimmerLoading.card(width: 170, height: 140);
+      return ShimmerLoading.card(width: 155, height: 130);
     }
 
     final isFieldMode = uiProvider.isFieldMode;
@@ -380,8 +386,8 @@ class _SyncRadarWidget extends StatelessWidget {
     final double progress = syncProvider.totalRecords == 0 ? 0 : syncProvider.syncedCount / syncProvider.totalRecords;
     
     return Container(
-      width: 170,
-      padding: const EdgeInsets.all(16),
+      width: 155,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isFieldMode ? Colors.white : const Color(0xFF1B5E20),
         borderRadius: BorderRadius.circular(24),
@@ -403,7 +409,7 @@ class _SyncRadarWidget extends StatelessWidget {
               Icon(
                 syncProvider.isSyncing ? Icons.radar_rounded : Icons.cloud_done_rounded,
                 color: isFieldMode ? const Color(0xFF1B5E20) : Colors.white70,
-                size: 28,
+                size: 24,
               ),
               if (syncProvider.isSyncing)
                 SizedBox(
@@ -432,7 +438,7 @@ class _SyncRadarWidget extends StatelessWidget {
             style: TextStyle(
               color: isFieldMode ? Colors.black : Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 13,
             ),
           ),
           const SizedBox(height: 8),
@@ -463,7 +469,7 @@ class _SyncRadarWidget extends StatelessWidget {
             '${syncProvider.syncedCount}/${syncProvider.totalRecords} Records Synced',
             style: TextStyle(
               color: isFieldMode ? Colors.black54 : Colors.white70,
-              fontSize: 11,
+              fontSize: 10,
             ),
           ),
         ],

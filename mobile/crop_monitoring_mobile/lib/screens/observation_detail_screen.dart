@@ -5,9 +5,11 @@ import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:provider/provider.dart';
 import '../services/local_db.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_drawer.dart';
+import '../providers/sync_provider.dart';
 
 class ObservationDetailScreen extends StatefulWidget {
   final dynamic observationId; 
@@ -29,6 +31,7 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
 
   Map<String, dynamic>? _detail;
   bool _loading = true;
+  bool _isConfirmedRemote = false;
 
   @override
   void initState() {
@@ -38,17 +41,35 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
 
   Future<void> _loadDetail() async {
     setState(() => _loading = true);
+    final syncProvider = context.read<SyncProvider>();
+    
     try {
-      if (widget.isOffline) {
+      // 1. ALWAYS attempt remote fetch if online
+      // This ensures we show the latest data from the database (e.g. if edited on web)
+      if (syncProvider.isOnline) {
+        try {
+          final supabase = SupabaseService();
+          final remoteData = await supabase.getObservationDetails(widget.observationId.toString());
+          if (remoteData != null) {
+            _detail = remoteData;
+            _isConfirmedRemote = true;
+            // Optionally update local cache here if you want
+            if (mounted) setState(() => _loading = false);
+            return;
+          }
+        } catch (e) {
+          debugPrint('ObservationDetail: Remote fetch failed, falling back to local: $e');
+        }
+      }
+
+      // 2. Fallback to Local Data
+      if (widget.isOffline || !syncProvider.isOnline) {
         final id = widget.observationId is String ? int.parse(widget.observationId) : widget.observationId;
         final localRecord = await _localDb.getObservationById(id);
         if (localRecord != null) {
           _detail = jsonDecode(localRecord['data']);
+          _isConfirmedRemote = localRecord['synced'] == 1;
         }
-      } else {
-        // Fetch from Supabase
-        final supabase = SupabaseService();
-        _detail = await supabase.getObservationDetails(widget.observationId.toString());
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -68,7 +89,7 @@ class _ObservationDetailScreenState extends State<ObservationDetailScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF1B5E20)),
         actions: [
-          if (!widget.isOffline)
+          if (_isConfirmedRemote)
             const Padding(
               padding: EdgeInsets.only(right: 16),
               child: Icon(Icons.cloud_done_rounded, color: Color(0xFF2E7D32)),
